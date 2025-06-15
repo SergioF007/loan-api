@@ -1,0 +1,48 @@
+# Binarios para programas y plugins
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Archivos de test
+*.test
+
+# Archivos de cobertura de output
+*.out
+
+# Archivo de dependencias de Go
+# go.sum
+
+# Directorio vendor
+vendor/
+
+# Variables de entorno
+# app.env
+
+# Logs
+*.log
+
+# Base de datos local
+*.db
+*.sqlite
+
+# Archivos del IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Archivos del sistema operativo
+.DS_Store
+Thumbs.db
+
+# Archivos de build
+bin/
+dist/
+build/
+
+# Archivos temporales
+tmp/
+temp/ 

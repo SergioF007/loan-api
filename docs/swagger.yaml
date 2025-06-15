@@ -1,0 +1,836 @@
+basePath: /api/v1
+definitions:
+  models.Loan:
+    properties:
+      amount:
+        minimum: 1
+        type: number
+      approval_date:
+        type: string
+      created_at:
+        type: string
+      id:
+        type: integer
+      purpose:
+        maxLength: 500
+        minLength: 10
+        type: string
+      request_date:
+        type: string
+      status:
+        allOf:
+        - $ref: '#/definitions/models.LoanStatus'
+        enum:
+        - pending
+        - approved
+        - rejected
+      updated_at:
+        type: string
+      user:
+        allOf:
+        - $ref: '#/definitions/models.User'
+        description: Relación con User (evitamos referencia circular con puntero)
+      user_id:
+        type: integer
+    required:
+    - amount
+    - purpose
+    - user_id
+    type: object
+  models.LoanRequest:
+    properties:
+      amount:
+        minimum: 1
+        type: number
+      purpose:
+        maxLength: 500
+        minLength: 10
+        type: string
+      user_id:
+        type: integer
+    required:
+    - amount
+    - purpose
+    - user_id
+    type: object
+  models.LoanResponse:
+    properties:
+      amount:
+        type: number
+      approval_date:
+        type: string
+      created_at:
+        type: string
+      id:
+        type: integer
+      purpose:
+        type: string
+      request_date:
+        type: string
+      status:
+        $ref: '#/definitions/models.LoanStatus'
+      updated_at:
+        type: string
+      user:
+        $ref: '#/definitions/models.User'
+      user_id:
+        type: integer
+    type: object
+  models.LoanStatus:
+    enum:
+    - pending
+    - approved
+    - rejected
+    type: string
+    x-enum-varnames:
+    - LoanStatusPending
+    - LoanStatusApproved
+    - LoanStatusRejected
+  models.LoanStatusUpdateRequest:
+    properties:
+      status:
+        allOf:
+        - $ref: '#/definitions/models.LoanStatus'
+        enum:
+        - pending
+        - approved
+        - rejected
+    required:
+    - status
+    type: object
+  models.User:
+    properties:
+      created_at:
+        type: string
+      credit_score:
+        maximum: 850
+        minimum: 300
+        type: integer
+      email:
+        type: string
+      id:
+        type: integer
+      income:
+        minimum: 0
+        type: number
+      loans:
+        description: Relaciones
+        items:
+          $ref: '#/definitions/models.Loan'
+        type: array
+      name:
+        maxLength: 100
+        minLength: 2
+        type: string
+      phone:
+        maxLength: 20
+        minLength: 10
+        type: string
+      updated_at:
+        type: string
+    required:
+    - credit_score
+    - email
+    - income
+    - name
+    - phone
+    type: object
+  models.UserRequest:
+    properties:
+      credit_score:
+        maximum: 850
+        minimum: 300
+        type: integer
+      email:
+        type: string
+      income:
+        minimum: 0
+        type: number
+      name:
+        maxLength: 100
+        minLength: 2
+        type: string
+      phone:
+        maxLength: 20
+        minLength: 10
+        type: string
+    required:
+    - credit_score
+    - email
+    - income
+    - name
+    - phone
+    type: object
+  models.UserResponse:
+    properties:
+      created_at:
+        type: string
+      credit_score:
+        type: integer
+      email:
+        type: string
+      id:
+        type: integer
+      income:
+        type: number
+      name:
+        type: string
+      phone:
+        type: string
+      updated_at:
+        type: string
+    type: object
+  utils.APIResponse:
+    properties:
+      data: {}
+      error:
+        $ref: '#/definitions/utils.ErrorInfo'
+      message:
+        type: string
+      success:
+        type: boolean
+    type: object
+  utils.ErrorInfo:
+    properties:
+      code:
+        type: integer
+      details:
+        type: string
+      message:
+        type: string
+    type: object
+  utils.PaginatedResponse:
+    properties:
+      data: {}
+      message:
+        type: string
+      pagination:
+        $ref: '#/definitions/utils.Pagination'
+      success:
+        type: boolean
+    type: object
+  utils.Pagination:
+    properties:
+      has_next:
+        type: boolean
+      has_prev:
+        type: boolean
+      limit:
+        type: integer
+      page:
+        type: integer
+      total:
+        type: integer
+      total_pages:
+        type: integer
+    type: object
+host: localhost:8080
+info:
+  contact:
+    email: support@swagger.io
+    name: Soporte API
+    url: http://www.swagger.io/support
+  description: API REST para gestión de solicitudes de préstamos
+  license:
+    name: Apache 2.0
+    url: http://www.apache.org/licenses/LICENSE-2.0.html
+  termsOfService: http://swagger.io/terms/
+  title: Loan API
+  version: "1.0"
+paths:
+  /api/v1/loans:
+    get:
+      consumes:
+      - application/json
+      description: Obtiene una lista paginada de préstamos con información del usuario
+      parameters:
+      - default: 1
+        description: Número de página
+        in: query
+        name: page
+        type: integer
+      - default: 20
+        description: Elementos por página
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/utils.PaginatedResponse'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/models.LoanResponse'
+                  type: array
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.APIResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.APIResponse'
+      summary: Listar préstamos
+      tags:
+      - loans
+    post:
+      consumes:
+      - application/json
+      description: Crea una nueva solicitud de préstamo en el sistema
+      parameters:
+      - description: Datos del préstamo
+        in: body
+        name: loan
+        required: true
+        schema:
+          $ref: '#/definitions/models.LoanRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            allOf:
+            - $ref: '#/definitions/utils.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/models.LoanResponse'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.APIResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/utils.APIResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.APIResponse'
+      summary: Crear una nueva solicitud de préstamo
+      tags:
+      - loans
+  /api/v1/loans/{id}:
+    get:
+      consumes:
+      - application/json
+      description: Obtiene la información de un préstamo por su ID
+      parameters:
+      - description: ID del préstamo
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/utils.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/models.LoanResponse'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.APIResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/utils.APIResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.APIResponse'
+      summary: Obtener préstamo por ID
+      tags:
+      - loans
+  /api/v1/loans/{id}/process:
+    post:
+      consumes:
+      - application/json
+      description: Procesa la aprobación automática de un préstamo basado en criterios
+        predefinidos
+      parameters:
+      - description: ID del préstamo
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/utils.APIResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.APIResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/utils.APIResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.APIResponse'
+      summary: Procesar aprobación automática de préstamo
+      tags:
+      - loans
+  /api/v1/loans/{id}/status:
+    put:
+      consumes:
+      - application/json
+      description: Actualiza el estado de un préstamo (pending, approved, rejected)
+      parameters:
+      - description: ID del préstamo
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Nuevo estado del préstamo
+        in: body
+        name: status
+        required: true
+        schema:
+          $ref: '#/definitions/models.LoanStatusUpdateRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/utils.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/models.LoanResponse'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.APIResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/utils.APIResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.APIResponse'
+      summary: Actualizar estado del préstamo
+      tags:
+      - loans
+  /api/v1/loans/statistics:
+    get:
+      consumes:
+      - application/json
+      description: Obtiene estadísticas generales de préstamos del sistema
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/utils.APIResponse'
+            - properties:
+                data:
+                  additionalProperties: true
+                  type: object
+              type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.APIResponse'
+      summary: Obtener estadísticas de préstamos
+      tags:
+      - loans
+  /api/v1/loans/status:
+    get:
+      consumes:
+      - application/json
+      description: Obtiene una lista paginada de préstamos filtrados por estado
+      parameters:
+      - description: Estado del préstamo (pending, approved, rejected)
+        in: query
+        name: status
+        required: true
+        type: string
+      - default: 1
+        description: Número de página
+        in: query
+        name: page
+        type: integer
+      - default: 20
+        description: Elementos por página
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/utils.PaginatedResponse'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/models.LoanResponse'
+                  type: array
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.APIResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.APIResponse'
+      summary: Obtener préstamos por estado
+      tags:
+      - loans
+  /api/v1/loans/user/{userId}:
+    get:
+      consumes:
+      - application/json
+      description: Obtiene una lista paginada de préstamos de un usuario específico
+      parameters:
+      - description: ID del usuario
+        in: path
+        name: userId
+        required: true
+        type: integer
+      - default: 1
+        description: Número de página
+        in: query
+        name: page
+        type: integer
+      - default: 20
+        description: Elementos por página
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/utils.PaginatedResponse'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/models.LoanResponse'
+                  type: array
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.APIResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/utils.APIResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.APIResponse'
+      summary: Obtener préstamos de un usuario
+      tags:
+      - loans
+  /api/v1/users:
+    get:
+      consumes:
+      - application/json
+      description: Obtiene una lista paginada de usuarios
+      parameters:
+      - default: 1
+        description: Número de página
+        in: query
+        name: page
+        type: integer
+      - default: 20
+        description: Elementos por página
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/utils.PaginatedResponse'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/models.UserResponse'
+                  type: array
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.APIResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.APIResponse'
+      summary: Listar usuarios
+      tags:
+      - users
+    post:
+      consumes:
+      - application/json
+      description: Crea un nuevo usuario en el sistema
+      parameters:
+      - description: Datos del usuario
+        in: body
+        name: user
+        required: true
+        schema:
+          $ref: '#/definitions/models.UserRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            allOf:
+            - $ref: '#/definitions/utils.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/models.UserResponse'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.APIResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/utils.APIResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.APIResponse'
+      summary: Crear un nuevo usuario
+      tags:
+      - users
+  /api/v1/users/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: Elimina un usuario del sistema (soft delete)
+      parameters:
+      - description: ID del usuario
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/utils.APIResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.APIResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/utils.APIResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.APIResponse'
+      summary: Eliminar usuario por ID
+      tags:
+      - users
+    get:
+      consumes:
+      - application/json
+      description: Obtiene la información de un usuario por su ID
+      parameters:
+      - description: ID del usuario
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/utils.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/models.UserResponse'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.APIResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/utils.APIResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.APIResponse'
+      summary: Obtener usuario por ID
+      tags:
+      - users
+    put:
+      consumes:
+      - application/json
+      description: Actualiza la información de un usuario existente
+      parameters:
+      - description: ID del usuario
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Datos actualizados del usuario
+        in: body
+        name: user
+        required: true
+        schema:
+          $ref: '#/definitions/models.UserRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/utils.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/models.UserResponse'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.APIResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/utils.APIResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/utils.APIResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.APIResponse'
+      summary: Actualizar usuario por ID
+      tags:
+      - users
+  /api/v1/users/{id}/credit-summary:
+    get:
+      consumes:
+      - application/json
+      description: Obtiene un resumen del estado crediticio de un usuario
+      parameters:
+      - description: ID del usuario
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/utils.APIResponse'
+            - properties:
+                data:
+                  additionalProperties: true
+                  type: object
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.APIResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/utils.APIResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.APIResponse'
+      summary: Obtener resumen crediticio del usuario
+      tags:
+      - users
+  /api/v1/users/search:
+    get:
+      consumes:
+      - application/json
+      description: Obtiene la información de un usuario por su email
+      parameters:
+      - description: Email del usuario
+        in: query
+        name: email
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/utils.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/models.UserResponse'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.APIResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/utils.APIResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.APIResponse'
+      summary: Obtener usuario por email
+      tags:
+      - users
+securityDefinitions:
+  Bearer:
+    description: Type "Bearer" followed by a space and JWT token.
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"
