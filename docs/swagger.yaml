@@ -51,12 +51,16 @@ definitions:
         type: number
       created_at:
         type: string
+      credit_score:
+        type: integer
       data:
         items:
           $ref: '#/definitions/models.LoanDataResponse'
         type: array
       id:
         type: integer
+      identity_verified:
+        type: boolean
       loan_type:
         $ref: '#/definitions/models.LoanTypeResponse'
       loan_type_id:
@@ -555,6 +559,56 @@ paths:
       security:
       - BearerAuth: []
       summary: Obtener información de un préstamo
+      tags:
+      - loans
+  /loans/{id}/decision:
+    post:
+      consumes:
+      - application/json
+      description: Evalúa el score crediticio y verificación de identidad para aprobar/rechazar
+        y realizar desembolso
+      parameters:
+      - description: ID del tenant
+        in: header
+        name: X-Tenant-ID
+        required: true
+        type: string
+      - description: ID del préstamo
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/utils.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/models.LoanResponse'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/utils.APIResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/utils.APIResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Procesar decisión final del préstamo
       tags:
       - loans
   /loans/data:

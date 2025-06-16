@@ -630,6 +630,86 @@ const docTemplate = `{
                 }
             }
         },
+        "/loans/{id}/decision": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Evalúa el score crediticio y verificación de identidad para aprobar/rechazar y realizar desembolso",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "loans"
+                ],
+                "summary": "Procesar decisión final del préstamo",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "ID del tenant",
+                        "name": "X-Tenant-ID",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "ID del préstamo",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/utils.APIResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/models.LoanResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/utils.APIResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/utils.APIResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/utils.APIResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/utils.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/tenants": {
             "get": {
                 "description": "Obtiene todos los tenants disponibles para pruebas",
@@ -751,6 +831,9 @@ const docTemplate = `{
                 "created_at": {
                     "type": "string"
                 },
+                "credit_score": {
+                    "type": "integer"
+                },
                 "data": {
                     "type": "array",
                     "items": {
@@ -759,6 +842,9 @@ const docTemplate = `{
                 },
                 "id": {
                     "type": "integer"
+                },
+                "identity_verified": {
+                    "type": "boolean"
                 },
                 "loan_type": {
                     "$ref": "#/definitions/models.LoanTypeResponse"
