@@ -39,6 +39,13 @@ const docTemplate = `{
                 "summary": "Iniciar sesión",
                 "parameters": [
                     {
+                        "type": "string",
+                        "description": "ID del tenant",
+                        "name": "X-Tenant-ID",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
                         "description": "Credenciales del usuario",
                         "name": "credentials",
                         "in": "body",
@@ -102,6 +109,13 @@ const docTemplate = `{
                 ],
                 "summary": "Registrar un nuevo usuario",
                 "parameters": [
+                    {
+                        "type": "string",
+                        "description": "ID del tenant",
+                        "name": "X-Tenant-ID",
+                        "in": "header",
+                        "required": true
+                    },
                     {
                         "description": "Datos del usuario",
                         "name": "user",
@@ -790,7 +804,7 @@ const docTemplate = `{
                 "is_required": {
                     "type": "boolean"
                 },
-                "name": {
+                "label": {
                     "type": "string"
                 },
                 "order": {
@@ -845,9 +859,6 @@ const docTemplate = `{
                 "label": {
                     "type": "string"
                 },
-                "name": {
-                    "type": "string"
-                },
                 "options": {
                     "type": "string"
                 },
@@ -867,12 +878,6 @@ const docTemplate = `{
             "properties": {
                 "description": {
                     "type": "string"
-                },
-                "form_inputs": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/models.LoanTypeVersionFormInputResponse"
-                    }
                 },
                 "forms": {
                     "type": "array",
@@ -1018,6 +1023,9 @@ const docTemplate = `{
                 },
                 "phone": {
                     "type": "string"
+                },
+                "tenant_id": {
+                    "type": "integer"
                 },
                 "updated_at": {
                     "type": "string"

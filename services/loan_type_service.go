@@ -80,7 +80,6 @@ func (s *loanTypeService) buildLoanTypeResponse(loanType models.LoanType) models
 			Version:     version.Version,
 			Description: version.Description,
 			Forms:       s.buildFormsResponse(version.Forms),
-			FormInputs:  s.buildFormInputsResponse(version.FormInputs),
 		}
 	}
 

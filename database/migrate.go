@@ -163,9 +163,11 @@ func seedInitialData() error {
 				InputType:       "text",
 				Placeholder:     "Ingrese su nombre completo",
 				ValidationRules: `{"required": true, "minLength": 2}`,
+				Options:         `{}`,
 				Order:           1,
 				IsRequired:      true,
 				IsActive:        true,
+				Config:          `{}`,
 			},
 			{
 				LoanTypeFormID:  formMap["personal_info"],
@@ -174,9 +176,11 @@ func seedInitialData() error {
 				InputType:       "number",
 				Placeholder:     "Ingrese su edad",
 				ValidationRules: `{"required": true, "min": 18, "max": 75}`,
+				Options:         `{}`,
 				Order:           2,
 				IsRequired:      true,
 				IsActive:        true,
+				Config:          `{}`,
 			},
 			// Inputs para Información Financiera
 			{
@@ -186,9 +190,11 @@ func seedInitialData() error {
 				InputType:       "number",
 				Placeholder:     "Ingrese sus ingresos mensuales",
 				ValidationRules: `{"required": true, "min": 1000000}`,
+				Options:         `{}`,
 				Order:           1,
 				IsRequired:      true,
 				IsActive:        true,
+				Config:          `{}`,
 			},
 			{
 				LoanTypeFormID:  formMap["financial_info"],
@@ -197,9 +203,11 @@ func seedInitialData() error {
 				InputType:       "number",
 				Placeholder:     "Ingrese sus gastos mensuales",
 				ValidationRules: `{"required": true, "min": 0}`,
+				Options:         `{}`,
 				Order:           2,
 				IsRequired:      true,
 				IsActive:        true,
+				Config:          `{}`,
 			},
 			// Inputs para Detalles del Préstamo
 			{
@@ -209,9 +217,11 @@ func seedInitialData() error {
 				InputType:       "number",
 				Placeholder:     "Ingrese el monto que desea solicitar",
 				ValidationRules: `{"required": true, "min": 100000, "max": 10000000}`,
+				Options:         `{}`,
 				Order:           1,
 				IsRequired:      true,
 				IsActive:        true,
+				Config:          `{}`,
 			},
 			{
 				LoanTypeFormID:  formMap["loan_details"],
@@ -224,6 +234,7 @@ func seedInitialData() error {
 				Order:           2,
 				IsRequired:      true,
 				IsActive:        true,
+				Config:          `{}`,
 			},
 		}
 

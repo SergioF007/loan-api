@@ -25,19 +25,18 @@ type LoanType struct {
 
 // LoanTypeVersion representa una versión de un tipo de crédito
 type LoanTypeVersion struct {
-	ID          uint                       `json:"id" gorm:"primaryKey"`
-	LoanTypeID  uint                       `json:"loan_type_id" gorm:"not null;index"`
-	LoanType    LoanType                   `json:"loan_type,omitempty"`
-	Version     string                     `json:"version" gorm:"size:50;not null"`
-	Description string                     `json:"description" gorm:"type:text"`
-	IsActive    bool                       `json:"is_active" gorm:"default:true"`
-	IsDefault   bool                       `json:"is_default" gorm:"default:false"`
-	Config      string                     `json:"config" gorm:"type:json"`
-	Forms       []LoanTypeForm             `json:"forms,omitempty"`
-	FormInputs  []LoanTypeVersionFormInput `json:"form_inputs,omitempty"`
-	CreatedAt   time.Time                  `json:"created_at" gorm:"autoCreateTime:true"`
-	UpdatedAt   time.Time                  `json:"updated_at" gorm:"autoUpdateTime:true"`
-	DeletedAt   gorm.DeletedAt             `json:"-" gorm:"index"`
+	ID          uint           `json:"id" gorm:"primaryKey"`
+	LoanTypeID  uint           `json:"loan_type_id" gorm:"not null;index"`
+	LoanType    LoanType       `json:"loan_type,omitempty"`
+	Version     string         `json:"version" gorm:"size:50;not null"`
+	Description string         `json:"description" gorm:"type:text"`
+	IsActive    bool           `json:"is_active" gorm:"default:true"`
+	IsDefault   bool           `json:"is_default" gorm:"default:false"`
+	Config      string         `json:"config" gorm:"type:json"`
+	Forms       []LoanTypeForm `json:"forms,omitempty"`
+	CreatedAt   time.Time      `json:"created_at" gorm:"autoCreateTime:true"`
+	UpdatedAt   time.Time      `json:"updated_at" gorm:"autoUpdateTime:true"`
+	DeletedAt   gorm.DeletedAt `json:"-" gorm:"index"`
 }
 
 // LoanTypeForm representa un formulario disponible para un tipo de crédito
@@ -52,7 +51,7 @@ type LoanTypeForm struct {
 	IsRequired        bool                       `json:"is_required" gorm:"default:false"`
 	IsActive          bool                       `json:"is_active" gorm:"default:true"`
 	Config            string                     `json:"config" gorm:"type:json"`
-	FormInputs        []LoanTypeVersionFormInput `json:"form_inputs,omitempty"`
+	FormInputs        []LoanTypeVersionFormInput `json:"form_inputs,omitempty" gorm:"foreignKey:LoanTypeFormID"`
 	CreatedAt         time.Time                  `json:"created_at" gorm:"autoCreateTime:true"`
 	UpdatedAt         time.Time                  `json:"updated_at" gorm:"autoUpdateTime:true"`
 	DeletedAt         gorm.DeletedAt             `json:"-" gorm:"index"`
@@ -92,11 +91,10 @@ type LoanTypeResponse struct {
 
 // LoanTypeVersionResponse representa la respuesta de una versión con formularios
 type LoanTypeVersionResponse struct {
-	ID          uint                               `json:"id"`
-	Version     string                             `json:"version"`
-	Description string                             `json:"description"`
-	Forms       []LoanTypeFormResponse             `json:"forms"`
-	FormInputs  []LoanTypeVersionFormInputResponse `json:"form_inputs"`
+	ID          uint                   `json:"id"`
+	Version     string                 `json:"version"`
+	Description string                 `json:"description"`
+	Forms       []LoanTypeFormResponse `json:"forms"`
 }
 
 // LoanTypeFormResponse representa la respuesta de un formulario
