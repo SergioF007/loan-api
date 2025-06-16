@@ -5,7 +5,7 @@ Esta guía te llevará paso a paso a través del flujo completo de la API de pr�
 ## 📋 Prerrequisitos
 
 1. **Aplicación ejecutándose**: `http://localhost:8080`
-2. **Base de datos configurada** con datos semilla
+2. **Base de datos configurada** con datos semilla cargados en proceso de migracion
 3. **Herramienta para hacer requests HTTP**:
    - **Postman** (recomendado)
    - **cURL** (línea de comandos)
