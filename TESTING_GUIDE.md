@@ -600,7 +600,7 @@ Usa un `user_id` que termine en 0 para simular fallo de desembolso:
 ## 📝 Notas Importantes
 
 1. **Orden de ejecución:** Los pasos deben ejecutarse en orden secuencial
-2. **Tokens JWT:** Tienen expiración de 15 minutos
+2. **Tokens JWT:** Tienen expiración de 10 horas
 3. **Tenant ID:** Siempre usar `1` para las pruebas
 4. **Document numbers:** Diferentes números generan diferentes scores
 5. **Nombres:** Deben coincidir parcialmente para verificación de identidad
