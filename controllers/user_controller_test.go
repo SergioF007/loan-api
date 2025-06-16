@@ -107,7 +107,6 @@ func TestUserController_RegisterUser(t *testing.T) {
 	})
 
 	t.Run("Debería fallar con email duplicado", func(t *testing.T) {
-		// Limpiar y cargar datos de prueba
 		test.LoadTestData(DB)
 
 		// Intentar crear usuario con email existente
@@ -121,20 +120,15 @@ func TestUserController_RegisterUser(t *testing.T) {
 			"password_confirmation": "Password123!",
 		}
 
-		// Realizar la petición POST
 		w := test.MakePostRequest(CONFIG, "/loan-api/api/v1/auth/register", requestBody, headers)
 
-		// Verificar código de respuesta de error
 		c.Equal(409, w.Code)
 
-		// Decodificar respuesta JSON
 		var response map[string]interface{}
 		c.NoError(json.Unmarshal(w.Body.Bytes(), &response))
 
-		// Verificar que hay un campo error
 		c.Contains(response, "error")
 
-		// Acceder al mensaje dentro del campo error
 		errorData := response["error"].(map[string]interface{})
 		c.Contains(errorData["message"], "El email ya está registrado")
 	})
@@ -151,20 +145,14 @@ func TestUserController_RegisterUser(t *testing.T) {
 			"password_confirmation": "Password123!",
 		}
 
-		// Realizar la petición POST
 		w := test.MakePostRequest(CONFIG, "/loan-api/api/v1/auth/register", requestBody, headers)
 
-		// Verificar código de respuesta de error
 		c.Equal(400, w.Code)
 
-		// Decodificar respuesta JSON
 		var response map[string]interface{}
 		c.NoError(json.Unmarshal(w.Body.Bytes(), &response))
 
-		// Verificar que hay un campo error (los errores de validación van en error)
 		c.Contains(response, "error")
-
-		// Acceder al mensaje dentro del campo error
 		errorData := response["error"].(map[string]interface{})
 		c.NotEmpty(errorData["message"])
 	})
@@ -181,42 +169,30 @@ func TestUserController_RegisterUser(t *testing.T) {
 			"password_confirmation": "DifferentPassword123!", // Contraseñas diferentes
 		}
 
-		// Realizar la petición POST
 		w := test.MakePostRequest(CONFIG, "/loan-api/api/v1/auth/register", requestBody, headers)
 
-		// Verificar código de respuesta de error
 		c.Equal(400, w.Code)
 
-		// Decodificar respuesta JSON
 		var response map[string]interface{}
 		c.NoError(json.Unmarshal(w.Body.Bytes(), &response))
 
-		// Verificar que hay un campo error
 		c.Contains(response, "error")
-
-		// Acceder al mensaje dentro del campo error
 		errorData := response["error"].(map[string]interface{})
 		c.Contains(errorData["message"], "Error de validación en el campo 'password_confirmation'")
 	})
 
 	t.Run("Debería fallar con formato JSON inválido", func(t *testing.T) {
-		// Request con formato JSON inválido (string en lugar de object)
 		invalidJSON := "invalid_json_string"
 
-		// Realizar la petición POST con JSON inválido
 		w := test.MakePostRequest(CONFIG, "/loan-api/api/v1/auth/register", invalidJSON, headers)
 
-		// Verificar código de respuesta de error
 		c.Equal(400, w.Code)
 
-		// Decodificar respuesta JSON
 		var response map[string]interface{}
 		c.NoError(json.Unmarshal(w.Body.Bytes(), &response))
 
-		// Verificar que hay un campo error
 		c.Contains(response, "error")
 
-		// Acceder al mensaje dentro del campo error
 		errorData := response["error"].(map[string]interface{})
 		c.Contains(errorData["message"], "Formato JSON inválido")
 	})
@@ -263,29 +239,22 @@ func TestUserController_Login(t *testing.T) {
 	})
 
 	t.Run("Debería fallar con credenciales incorrectas", func(t *testing.T) {
-		// Cargar datos de prueba
 		test.LoadTestData(DB)
 
-		// Datos de login con contraseña incorrecta
 		requestBody := map[string]interface{}{
 			"email":    "juan@example.com",
 			"password": "wrongpassword",
 		}
 
-		// Realizar la petición POST
 		w := test.MakePostRequest(CONFIG, "/loan-api/api/v1/auth/login", requestBody, headers)
 
-		// Verificar código de respuesta de error
 		c.Equal(400, w.Code)
 
-		// Decodificar respuesta JSON
 		var response map[string]interface{}
 		c.NoError(json.Unmarshal(w.Body.Bytes(), &response))
 
-		// Verificar que hay un campo error
 		c.Contains(response, "error")
 
-		// Acceder al mensaje dentro del campo error
 		errorData := response["error"].(map[string]interface{})
 		c.Contains(errorData["details"], "Email o contraseña incorrectos")
 	})
@@ -300,20 +269,15 @@ func TestUserController_Login(t *testing.T) {
 			"password": "password123!",
 		}
 
-		// Realizar la petición POST
 		w := test.MakePostRequest(CONFIG, "/loan-api/api/v1/auth/login", requestBody, headers)
 
-		// Verificar código de respuesta de error
 		c.Equal(400, w.Code)
 
-		// Decodificar respuesta JSON
 		var response map[string]interface{}
 		c.NoError(json.Unmarshal(w.Body.Bytes(), &response))
 
-		// Verificar que hay un campo error
 		c.Contains(response, "error")
 
-		// Acceder al mensaje dentro del campo error
 		errorData := response["error"].(map[string]interface{})
 		c.Contains(errorData["message"], "Email o contraseña incorrectos")
 	})

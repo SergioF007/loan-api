@@ -360,7 +360,6 @@ func (s *loanService) buildLoanResponse(loan models.Loan, user models.User, loan
 
 // ProcessLoanDecision evalúa el préstamo y toma la decisión final de aprobación/rechazo
 func (s *loanService) ProcessLoanDecision(loanID uint) (*models.LoanResponse, error) {
-	// Obtener el préstamo con todos sus datos
 	loan, err := s.loanRepo.GetByID(loanID)
 	if err != nil {
 		return nil, errors.New("préstamo no encontrado")

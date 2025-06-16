@@ -42,13 +42,11 @@ func (ctrl *UserController) RegisterUser(c *gin.Context) {
 
 	var req models.RegisterRequest
 
-	// Parsear JSON del request
 	if err := c.ShouldBindJSON(&req); err != nil {
 		utils.BadRequestResponse(c, "Formato JSON inválido")
 		return
 	}
 
-	// Obtener tenant_id del contexto (establecido por el middleware Tenant)
 	tenantID, exists := c.Get("tenant_id")
 	if !exists {
 		utils.BadRequestResponse(c, "ID de tenant requerido")
@@ -90,13 +88,11 @@ func (ctrl *UserController) Login(c *gin.Context) {
 
 	var req models.LoginRequest
 
-	// Parsear JSON del request
 	if err := c.ShouldBindJSON(&req); err != nil {
 		utils.BadRequestResponse(c, "Formato JSON inválido")
 		return
 	}
 
-	// Obtener tenant_id del contexto (establecido por el middleware Tenant)
 	tenantID, exists := c.Get("tenant_id")
 	if !exists {
 		utils.BadRequestResponse(c, "ID de tenant requerido")
@@ -116,6 +112,5 @@ func (ctrl *UserController) Login(c *gin.Context) {
 		return
 	}
 
-	// Retornar respuesta exitosa
 	utils.SuccessResponse(c, 200, "Login exitoso", response)
 }

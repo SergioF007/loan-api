@@ -92,17 +92,13 @@ func (ctrl *LoanController) CreateLoan(c *gin.Context) {
 func (ctrl *LoanController) SaveLoanData(c *gin.Context) {
 	log.Println("LoanController::SaveLoanData was invoked")
 
-	// El tenant ya fue validado por el middleware
-
 	var req models.SaveLoanDataRequest
 
-	// Parsear JSON del request
 	if err := c.ShouldBindJSON(&req); err != nil {
 		utils.BadRequestResponse(c, "Formato JSON inválido")
 		return
 	}
 
-	// Validar campos requeridos
 	if req.LoanID == 0 {
 		utils.BadRequestResponse(c, "loan_id es requerido")
 		return
@@ -177,14 +173,12 @@ func (ctrl *LoanController) GetLoan(c *gin.Context) {
 func (ctrl *LoanController) GetUserLoans(c *gin.Context) {
 	log.Println("LoanController::GetUserLoans was invoked")
 
-	// Obtener ID del usuario desde el contexto (middleware de autenticación)
 	userID, exists := c.Get("user_id")
 	if !exists {
 		utils.UnauthorizedResponse(c, "Token de autenticación requerido")
 		return
 	}
 
-	// Obtener préstamos del usuario
 	loansResponse, err := ctrl.loanService.GetLoansByUserID(userID.(uint))
 	if err != nil {
 		utils.InternalServerErrorResponse(c, err.Error())
@@ -213,7 +207,6 @@ func (ctrl *LoanController) GetUserLoans(c *gin.Context) {
 func (ctrl *LoanController) ProcessLoanDecision(c *gin.Context) {
 	log.Println("LoanController::ProcessLoanDecision was invoked")
 
-	// Obtener ID del préstamo desde los parámetros
 	loanIDStr := c.Param("id")
 	loanID, err := strconv.ParseUint(loanIDStr, 10, 32)
 	if err != nil {
@@ -221,13 +214,11 @@ func (ctrl *LoanController) ProcessLoanDecision(c *gin.Context) {
 		return
 	}
 
-	// Procesar decisión del préstamo
 	loanResponse, err := ctrl.loanService.ProcessLoanDecision(uint(loanID))
 	if err != nil {
 		utils.InternalServerErrorResponse(c, err.Error())
 		return
 	}
 
-	// Retornar respuesta exitosa
 	utils.SuccessResponse(c, 200, "Decisión del préstamo procesada exitosamente", loanResponse)
 }
