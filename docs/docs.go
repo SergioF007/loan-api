@@ -723,6 +723,15 @@ const docTemplate = `{
                     "tenants"
                 ],
                 "summary": "Obtener tenants disponibles",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "ID del tenant",
+                        "name": "X-Tenant-ID",
+                        "in": "header",
+                        "required": true
+                    }
+                ],
                 "responses": {
                     "200": {
                         "description": "OK",

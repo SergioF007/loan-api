@@ -26,6 +26,7 @@ func NewTenantController(tenantService services.TenantService) *TenantController
 // @Tags tenants
 // @Accept json
 // @Produce json
+// @Param X-Tenant-ID header string true "ID del tenant"
 // @Success 200 {object} utils.APIResponse{data=[]models.TenantResponse}
 // @Failure 500 {object} utils.APIResponse
 // @Router /tenants [get]

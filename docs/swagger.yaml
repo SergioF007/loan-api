@@ -707,6 +707,12 @@ paths:
       consumes:
       - application/json
       description: Obtiene todos los tenants disponibles para pruebas
+      parameters:
+      - description: ID del tenant
+        in: header
+        name: X-Tenant-ID
+        required: true
+        type: string
       produces:
       - application/json
       responses:
