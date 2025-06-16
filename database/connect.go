@@ -1,6 +1,7 @@
 package database
 
 import (
+	"database/sql"
 	"fmt"
 	"log"
 	"time"
@@ -14,53 +15,74 @@ import (
 
 var DB *gorm.DB
 
-// ConnectDB establece la conexión con la base de datos MySQL
-func ConnectDB(cfg *config.Config) error {
-	var err error
-
-	// Configurar el logger de GORM
-	logLevel := logger.Silent
-	if cfg.IsDevelopment() {
-		logLevel = logger.Info
+// Connect inicializa la conexión a la base de datos con configuración dinámica
+func Connect(cfg *config.Config) {
+	if DB != nil {
+		return
 	}
 
-	// Configuración de GORM
-	gormConfig := &gorm.Config{
-		Logger: logger.Default.LogMode(logLevel),
-	}
-
-	// Conectar a la base de datos
-	DB, err = gorm.Open(mysql.Open(cfg.GetDSN()), gormConfig)
+	dsn := buildDSN(cfg)
+	db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{
+		Logger: logger.Default.LogMode(getLogLevel(cfg)),
+	})
 	if err != nil {
-		return fmt.Errorf("error al conectar con la base de datos: %w", err)
+		log.Fatal("❌ Error al conectar a la base de datos:", err)
 	}
 
-	// Obtener la conexión SQL subyacente para configurar el pool
+	DB = db
+
 	sqlDB, err := DB.DB()
 	if err != nil {
-		return fmt.Errorf("error al obtener la conexión SQL: %w", err)
+		log.Fatal("❌ Error al obtener DB SQL:", err)
 	}
 
-	// Configurar el pool de conexiones
-	sqlDB.SetMaxIdleConns(10)           // Conexiones inactivas
-	sqlDB.SetMaxOpenConns(30)           // Conexiones máximas abiertas
-	sqlDB.SetConnMaxLifetime(time.Hour) // Tiempo de vida de las conexiones
+	configureConnectionPool(sqlDB, cfg)
 
-	// Verificar la conexión
 	if err := sqlDB.Ping(); err != nil {
-		return fmt.Errorf("error al hacer ping a la base de datos: %w", err)
+		log.Fatal("❌ Error al hacer ping a la base de datos:", err)
 	}
 
-	log.Println("✅ Conexión a la base de datos establecida exitosamente")
-	return nil
+	log.Println("✅ Conexión a la base de datos establecida")
+
+	if err := Migrate(); err != nil {
+		log.Fatal("❌ Error al ejecutar migraciones:", err)
+	}
 }
 
-// GetDB retorna la instancia de la base de datos
+// buildDSN genera el Data Source Name para MySQL
+func buildDSN(cfg *config.Config) string {
+	return fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?charset=utf8mb4&parseTime=True&loc=Local",
+		cfg.DBUser, cfg.DBPassword, cfg.DBHost, cfg.DBPort, cfg.DBName,
+	)
+}
+
+// getLogLevel retorna el nivel de logging según el entorno
+func getLogLevel(cfg *config.Config) logger.LogLevel {
+	if cfg.IsDevelopment() {
+		return logger.Info
+	}
+	return logger.Silent
+}
+
+// configureConnectionPool configura los parámetros del pool de conexiones
+func configureConnectionPool(sqlDB *sql.DB, cfg *config.Config) {
+	if cfg.IsDevelopment() {
+		sqlDB.SetMaxIdleConns(5)
+		sqlDB.SetMaxOpenConns(10)
+		sqlDB.SetConnMaxLifetime(30 * time.Minute)
+	} else {
+		sqlDB.SetMaxIdleConns(20)
+		sqlDB.SetMaxOpenConns(50)
+		sqlDB.SetConnMaxLifetime(2 * time.Hour)
+	}
+}
+
+// GetDB retorna la instancia GORM de la base de datos
 func GetDB() *gorm.DB {
 	return DB
 }
 
-// CloseDB cierra la conexión con la base de datos
+// CloseDB cierra la conexión activa
 func CloseDB() error {
 	if DB != nil {
 		sqlDB, err := DB.DB()

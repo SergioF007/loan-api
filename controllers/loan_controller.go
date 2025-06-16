@@ -1,115 +1,132 @@
 package controllers
 
 import (
-	"net/http"
-	"strconv"
-
 	"loan-api/models"
 	"loan-api/services"
 	"loan-api/utils"
+	"log"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
 )
 
 // LoanController maneja las operaciones relacionadas con préstamos
 type LoanController struct {
-	loanService services.LoanService
+	loanService   services.LoanService
+	tenantService services.TenantService
 }
 
 // NewLoanController crea una nueva instancia del controlador de préstamos
-func NewLoanController(loanService services.LoanService) *LoanController {
+func NewLoanController(loanService services.LoanService, tenantService services.TenantService) *LoanController {
 	return &LoanController{
-		loanService: loanService,
+		loanService:   loanService,
+		tenantService: tenantService,
 	}
 }
 
 // CreateLoan godoc
 // @Summary Crear una nueva solicitud de préstamo
-// @Description Crea una nueva solicitud de préstamo en el sistema
+// @Description Crea una nueva solicitud de préstamo para un usuario autenticado
 // @Tags loans
 // @Accept json
 // @Produce json
-// @Param loan body models.LoanRequest true "Datos del préstamo"
+// @Security BearerAuth
+// @Param X-Tenant-ID header string true "ID del tenant"
+// @Param loan body models.CreateLoanRequest true "Datos de la solicitud de préstamo"
 // @Success 201 {object} utils.APIResponse{data=models.LoanResponse}
 // @Failure 400 {object} utils.APIResponse
+// @Failure 401 {object} utils.APIResponse
 // @Failure 404 {object} utils.APIResponse
 // @Failure 500 {object} utils.APIResponse
-// @Router /api/v1/loans [post]
+// @Router /loans [post]
 func (ctrl *LoanController) CreateLoan(c *gin.Context) {
-	var req models.LoanRequest
+	log.Println("LoanController::CreateLoan was invoked")
+
+	// Validar header X-Tenant-ID
+	tenantIDStr := c.GetHeader("X-Tenant-ID")
+	if tenantIDStr == "" {
+		utils.BadRequestResponse(c, "Header X-Tenant-ID es requerido")
+		return
+	}
+
+	tenantID, err := strconv.ParseUint(tenantIDStr, 10, 32)
+	if err != nil {
+		utils.BadRequestResponse(c, "X-Tenant-ID debe ser un número válido")
+		return
+	}
+
+	// Validar que el tenant existe
+	_, err = ctrl.tenantService.ValidateTenantID(uint(tenantID))
+	if err != nil {
+		utils.NotFoundResponse(c, "Tenant no encontrado")
+		return
+	}
+
+	var req models.CreateLoanRequest
 
 	// Parsear JSON del request
 	if err := c.ShouldBindJSON(&req); err != nil {
 		utils.BadRequestResponse(c, "Formato JSON inválido")
+		return
+	}
+
+	// Obtener ID del usuario desde el contexto (middleware de autenticación)
+	userID, exists := c.Get("user_id")
+	if !exists {
+		utils.UnauthorizedResponse(c, "Token de autenticación requerido")
 		return
 	}
 
 	// Crear préstamo
-	loan, err := ctrl.loanService.CreateLoan(&req)
+	loanResponse, err := ctrl.loanService.CreateLoan(userID.(uint), req)
 	if err != nil {
-		utils.ErrorResponse(c, err)
+		utils.InternalServerErrorResponse(c, err.Error())
 		return
 	}
 
 	// Retornar respuesta exitosa
-	utils.CreatedResponse(c, "Solicitud de préstamo creada exitosamente", loan.ToResponse())
+	utils.CreatedResponse(c, "Solicitud de préstamo creada exitosamente", loanResponse)
 }
 
-// GetLoan godoc
-// @Summary Obtener préstamo por ID
-// @Description Obtiene la información de un préstamo por su ID
+// SaveLoanData godoc
+// @Summary Guardar datos de una solicitud de préstamo
+// @Description Guarda los datos dinámicos de una solicitud de préstamo existente
 // @Tags loans
 // @Accept json
 // @Produce json
-// @Param id path int true "ID del préstamo"
-// @Success 200 {object} utils.APIResponse{data=models.LoanResponse}
+// @Security BearerAuth
+// @Param X-Tenant-ID header string true "ID del tenant"
+// @Param data body models.SaveLoanDataRequest true "Datos del préstamo a guardar"
+// @Success 200 {object} utils.APIResponse
 // @Failure 400 {object} utils.APIResponse
+// @Failure 401 {object} utils.APIResponse
 // @Failure 404 {object} utils.APIResponse
 // @Failure 500 {object} utils.APIResponse
-// @Router /api/v1/loans/{id} [get]
-func (ctrl *LoanController) GetLoan(c *gin.Context) {
-	// Obtener ID del parámetro URL
-	idStr := c.Param("id")
-	id, err := strconv.ParseUint(idStr, 10, 32)
-	if err != nil {
-		utils.BadRequestResponse(c, "ID de préstamo inválido")
+// @Router /loans/data [post]
+func (ctrl *LoanController) SaveLoanData(c *gin.Context) {
+	log.Println("LoanController::SaveLoanData was invoked")
+
+	// Validar header X-Tenant-ID
+	tenantIDStr := c.GetHeader("X-Tenant-ID")
+	if tenantIDStr == "" {
+		utils.BadRequestResponse(c, "Header X-Tenant-ID es requerido")
 		return
 	}
 
-	// Obtener préstamo con información del usuario
-	loan, err := ctrl.loanService.GetLoanByIDWithUser(uint(id))
+	tenantID, err := strconv.ParseUint(tenantIDStr, 10, 32)
 	if err != nil {
-		utils.ErrorResponse(c, err)
+		utils.BadRequestResponse(c, "X-Tenant-ID debe ser un número válido")
 		return
 	}
 
-	// Retornar respuesta exitosa
-	utils.SuccessResponse(c, http.StatusOK, "Préstamo obtenido exitosamente", loan.ToResponse())
-}
-
-// UpdateLoanStatus godoc
-// @Summary Actualizar estado del préstamo
-// @Description Actualiza el estado de un préstamo (pending, approved, rejected)
-// @Tags loans
-// @Accept json
-// @Produce json
-// @Param id path int true "ID del préstamo"
-// @Param status body models.LoanStatusUpdateRequest true "Nuevo estado del préstamo"
-// @Success 200 {object} utils.APIResponse{data=models.LoanResponse}
-// @Failure 400 {object} utils.APIResponse
-// @Failure 404 {object} utils.APIResponse
-// @Failure 500 {object} utils.APIResponse
-// @Router /api/v1/loans/{id}/status [put]
-func (ctrl *LoanController) UpdateLoanStatus(c *gin.Context) {
-	// Obtener ID del parámetro URL
-	idStr := c.Param("id")
-	id, err := strconv.ParseUint(idStr, 10, 32)
+	// Validar que el tenant existe
+	_, err = ctrl.tenantService.ValidateTenantID(uint(tenantID))
 	if err != nil {
-		utils.BadRequestResponse(c, "ID de préstamo inválido")
+		utils.NotFoundResponse(c, "Tenant no encontrado")
 		return
 	}
 
-	var req models.LoanStatusUpdateRequest
+	var req models.SaveLoanDataRequest
 
 	// Parsear JSON del request
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -117,219 +134,124 @@ func (ctrl *LoanController) UpdateLoanStatus(c *gin.Context) {
 		return
 	}
 
-	// Actualizar estado del préstamo
-	loan, err := ctrl.loanService.UpdateLoanStatus(uint(id), &req)
-	if err != nil {
-		utils.ErrorResponse(c, err)
+	// Guardar datos del préstamo
+	if err := ctrl.loanService.SaveLoanData(req); err != nil {
+		utils.InternalServerErrorResponse(c, err.Error())
 		return
 	}
 
 	// Retornar respuesta exitosa
-	utils.UpdatedResponse(c, "Estado del préstamo actualizado exitosamente", loan.ToResponse())
+	utils.SuccessResponse(c, 200, "Datos del préstamo guardados exitosamente", nil)
 }
 
-// ListLoans godoc
-// @Summary Listar préstamos
-// @Description Obtiene una lista paginada de préstamos con información del usuario
+// GetLoan godoc
+// @Summary Obtener información de un préstamo
+// @Description Obtiene la información completa de un préstamo por ID
 // @Tags loans
 // @Accept json
 // @Produce json
-// @Param page query int false "Número de página" default(1)
-// @Param limit query int false "Elementos por página" default(20)
-// @Success 200 {object} utils.PaginatedResponse{data=[]models.LoanResponse}
+// @Security BearerAuth
+// @Param X-Tenant-ID header string true "ID del tenant"
+// @Param id path int true "ID del préstamo"
+// @Success 200 {object} utils.APIResponse{data=models.LoanResponse}
 // @Failure 400 {object} utils.APIResponse
-// @Failure 500 {object} utils.APIResponse
-// @Router /api/v1/loans [get]
-func (ctrl *LoanController) ListLoans(c *gin.Context) {
-	// Obtener parámetros de paginación
-	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
-
-	// Validar parámetros
-	if page < 1 {
-		page = 1
-	}
-	if limit < 1 || limit > 100 {
-		limit = 20
-	}
-
-	// Obtener préstamos con información del usuario
-	loans, total, err := ctrl.loanService.ListLoansWithUsers(page, limit)
-	if err != nil {
-		utils.ErrorResponse(c, err)
-		return
-	}
-
-	// Convertir a respuestas
-	loanResponses := make([]models.LoanResponse, len(loans))
-	for i, loan := range loans {
-		loanResponses[i] = loan.ToResponse()
-	}
-
-	// Crear paginación
-	pagination := utils.NewPagination(page, limit, total)
-
-	// Retornar respuesta paginada
-	utils.PaginatedSuccessResponse(c, "Préstamos obtenidos exitosamente", loanResponses, pagination)
-}
-
-// GetLoansByUser godoc
-// @Summary Obtener préstamos de un usuario
-// @Description Obtiene una lista paginada de préstamos de un usuario específico
-// @Tags loans
-// @Accept json
-// @Produce json
-// @Param userId path int true "ID del usuario"
-// @Param page query int false "Número de página" default(1)
-// @Param limit query int false "Elementos por página" default(20)
-// @Success 200 {object} utils.PaginatedResponse{data=[]models.LoanResponse}
-// @Failure 400 {object} utils.APIResponse
+// @Failure 401 {object} utils.APIResponse
 // @Failure 404 {object} utils.APIResponse
 // @Failure 500 {object} utils.APIResponse
-// @Router /api/v1/loans/user/{userId} [get]
-func (ctrl *LoanController) GetLoansByUser(c *gin.Context) {
-	// Obtener ID del usuario del parámetro URL
-	userIDStr := c.Param("userId")
-	userID, err := strconv.ParseUint(userIDStr, 10, 32)
-	if err != nil {
-		utils.BadRequestResponse(c, "ID de usuario inválido")
+// @Router /loans/{id} [get]
+func (ctrl *LoanController) GetLoan(c *gin.Context) {
+	log.Println("LoanController::GetLoan was invoked")
+
+	// Validar header X-Tenant-ID
+	tenantIDStr := c.GetHeader("X-Tenant-ID")
+	if tenantIDStr == "" {
+		utils.BadRequestResponse(c, "Header X-Tenant-ID es requerido")
 		return
 	}
 
-	// Obtener parámetros de paginación
-	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
-
-	// Validar parámetros
-	if page < 1 {
-		page = 1
+	tenantID, err := strconv.ParseUint(tenantIDStr, 10, 32)
+	if err != nil {
+		utils.BadRequestResponse(c, "X-Tenant-ID debe ser un número válido")
+		return
 	}
-	if limit < 1 || limit > 100 {
-		limit = 20
+
+	// Validar que el tenant existe
+	_, err = ctrl.tenantService.ValidateTenantID(uint(tenantID))
+	if err != nil {
+		utils.NotFoundResponse(c, "Tenant no encontrado")
+		return
+	}
+
+	// Obtener ID del préstamo desde los parámetros
+	loanIDStr := c.Param("id")
+	loanID, err := strconv.ParseUint(loanIDStr, 10, 32)
+	if err != nil {
+		utils.BadRequestResponse(c, "ID del préstamo debe ser un número válido")
+		return
+	}
+
+	// Obtener préstamo
+	loanResponse, err := ctrl.loanService.GetLoanByID(uint(loanID))
+	if err != nil {
+		utils.NotFoundResponse(c, err.Error())
+		return
+	}
+
+	// Retornar respuesta exitosa
+	utils.SuccessResponse(c, 200, "Préstamo obtenido exitosamente", loanResponse)
+}
+
+// GetUserLoans godoc
+// @Summary Obtener préstamos de un usuario
+// @Description Obtiene todos los préstamos de un usuario autenticado
+// @Tags loans
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param X-Tenant-ID header string true "ID del tenant"
+// @Success 200 {object} utils.APIResponse{data=[]models.LoanResponse}
+// @Failure 400 {object} utils.APIResponse
+// @Failure 401 {object} utils.APIResponse
+// @Failure 404 {object} utils.APIResponse
+// @Failure 500 {object} utils.APIResponse
+// @Router /loans/user [get]
+func (ctrl *LoanController) GetUserLoans(c *gin.Context) {
+	log.Println("LoanController::GetUserLoans was invoked")
+
+	// Validar header X-Tenant-ID
+	tenantIDStr := c.GetHeader("X-Tenant-ID")
+	if tenantIDStr == "" {
+		utils.BadRequestResponse(c, "Header X-Tenant-ID es requerido")
+		return
+	}
+
+	tenantID, err := strconv.ParseUint(tenantIDStr, 10, 32)
+	if err != nil {
+		utils.BadRequestResponse(c, "X-Tenant-ID debe ser un número válido")
+		return
+	}
+
+	// Validar que el tenant existe
+	_, err = ctrl.tenantService.ValidateTenantID(uint(tenantID))
+	if err != nil {
+		utils.NotFoundResponse(c, "Tenant no encontrado")
+		return
+	}
+
+	// Obtener ID del usuario desde el contexto (middleware de autenticación)
+	userID, exists := c.Get("user_id")
+	if !exists {
+		utils.UnauthorizedResponse(c, "Token de autenticación requerido")
+		return
 	}
 
 	// Obtener préstamos del usuario
-	loans, total, err := ctrl.loanService.GetLoansByUserID(uint(userID), page, limit)
+	loansResponse, err := ctrl.loanService.GetLoansByUserID(userID.(uint))
 	if err != nil {
-		utils.ErrorResponse(c, err)
-		return
-	}
-
-	// Convertir a respuestas
-	loanResponses := make([]models.LoanResponse, len(loans))
-	for i, loan := range loans {
-		loanResponses[i] = loan.ToResponse()
-	}
-
-	// Crear paginación
-	pagination := utils.NewPagination(page, limit, total)
-
-	// Retornar respuesta paginada
-	utils.PaginatedSuccessResponse(c, "Préstamos del usuario obtenidos exitosamente", loanResponses, pagination)
-}
-
-// GetLoansByStatus godoc
-// @Summary Obtener préstamos por estado
-// @Description Obtiene una lista paginada de préstamos filtrados por estado
-// @Tags loans
-// @Accept json
-// @Produce json
-// @Param status query string true "Estado del préstamo (pending, approved, rejected)"
-// @Param page query int false "Número de página" default(1)
-// @Param limit query int false "Elementos por página" default(20)
-// @Success 200 {object} utils.PaginatedResponse{data=[]models.LoanResponse}
-// @Failure 400 {object} utils.APIResponse
-// @Failure 500 {object} utils.APIResponse
-// @Router /api/v1/loans/status [get]
-func (ctrl *LoanController) GetLoansByStatus(c *gin.Context) {
-	// Obtener estado del query parameter
-	status := c.Query("status")
-	if status == "" {
-		utils.BadRequestResponse(c, "Estado es requerido")
-		return
-	}
-
-	// Obtener parámetros de paginación
-	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
-
-	// Validar parámetros
-	if page < 1 {
-		page = 1
-	}
-	if limit < 1 || limit > 100 {
-		limit = 20
-	}
-
-	// Obtener préstamos por estado
-	loans, total, err := ctrl.loanService.GetLoansByStatus(status, page, limit)
-	if err != nil {
-		utils.ErrorResponse(c, err)
-		return
-	}
-
-	// Convertir a respuestas
-	loanResponses := make([]models.LoanResponse, len(loans))
-	for i, loan := range loans {
-		loanResponses[i] = loan.ToResponse()
-	}
-
-	// Crear paginación
-	pagination := utils.NewPagination(page, limit, total)
-
-	// Retornar respuesta paginada
-	utils.PaginatedSuccessResponse(c, "Préstamos obtenidos exitosamente", loanResponses, pagination)
-}
-
-// ProcessLoanApproval godoc
-// @Summary Procesar aprobación automática de préstamo
-// @Description Procesa la aprobación automática de un préstamo basado en criterios predefinidos
-// @Tags loans
-// @Accept json
-// @Produce json
-// @Param id path int true "ID del préstamo"
-// @Success 200 {object} utils.APIResponse
-// @Failure 400 {object} utils.APIResponse
-// @Failure 404 {object} utils.APIResponse
-// @Failure 500 {object} utils.APIResponse
-// @Router /api/v1/loans/{id}/process [post]
-func (ctrl *LoanController) ProcessLoanApproval(c *gin.Context) {
-	// Obtener ID del parámetro URL
-	idStr := c.Param("id")
-	id, err := strconv.ParseUint(idStr, 10, 32)
-	if err != nil {
-		utils.BadRequestResponse(c, "ID de préstamo inválido")
-		return
-	}
-
-	// Procesar aprobación automática
-	err = ctrl.loanService.ProcessLoanApproval(uint(id))
-	if err != nil {
-		utils.ErrorResponse(c, err)
+		utils.InternalServerErrorResponse(c, err.Error())
 		return
 	}
 
 	// Retornar respuesta exitosa
-	utils.SuccessResponse(c, http.StatusOK, "Préstamo procesado exitosamente", nil)
-}
-
-// GetLoanStatistics godoc
-// @Summary Obtener estadísticas de préstamos
-// @Description Obtiene estadísticas generales de préstamos del sistema
-// @Tags loans
-// @Accept json
-// @Produce json
-// @Success 200 {object} utils.APIResponse{data=map[string]interface{}}
-// @Failure 500 {object} utils.APIResponse
-// @Router /api/v1/loans/statistics [get]
-func (ctrl *LoanController) GetLoanStatistics(c *gin.Context) {
-	// Obtener estadísticas
-	stats, err := ctrl.loanService.GetLoanStatistics()
-	if err != nil {
-		utils.ErrorResponse(c, err)
-		return
-	}
-
-	// Retornar respuesta exitosa
-	utils.SuccessResponse(c, http.StatusOK, "Estadísticas obtenidas exitosamente", stats)
+	utils.SuccessResponse(c, 200, "Préstamos obtenidos exitosamente", loansResponse)
 }

@@ -6,59 +6,233 @@ import (
 	"loan-api/models"
 )
 
-// AutoMigrate ejecuta las migraciones automáticas de GORM
-func AutoMigrate() error {
-	log.Println("🔄 Iniciando migraciones de base de datos...")
-
-	// Ejecutar migraciones para todos los modelos
+// Migrate ejecuta las migraciones de la base de datos
+func Migrate() error {
+	// Ejecutar migraciones automáticas
 	err := DB.AutoMigrate(
 		&models.User{},
+		&models.Tenant{},
+		&models.LoanType{},
+		&models.LoanTypeVersion{},
+		&models.LoanTypeForm{},
+		&models.LoanTypeVersionFormInput{},
 		&models.Loan{},
+		&models.LoanData{},
 	)
 
 	if err != nil {
-		log.Printf("❌ Error en las migraciones: %v", err)
+		log.Printf("Error en la migración: %v", err)
 		return err
 	}
 
-	log.Println("✅ Migraciones completadas exitosamente")
+	// Ejecutar seeders para datos iniciales
+	if err := seedInitialData(); err != nil {
+		log.Printf("Error en los seeders: %v", err)
+		return err
+	}
+
+	log.Println("Migraciones ejecutadas correctamente")
 	return nil
 }
 
-// DropTables elimina todas las tablas (útil para desarrollo)
-// ⚠️ CUIDADO: Solo usar en desarrollo
-func DropTables() error {
-	log.Println("⚠️  Eliminando todas las tablas...")
-
-	err := DB.Migrator().DropTable(
-		&models.Loan{},
-		&models.User{},
-	)
-
-	if err != nil {
-		log.Printf("❌ Error al eliminar tablas: %v", err)
-		return err
+// seedInitialData inserta datos iniciales de configuración
+func seedInitialData() error {
+	// Crear tenant de prueba
+	var tenant models.Tenant
+	result := DB.Where("code = ?", "test_bank").First(&tenant)
+	if result.Error != nil {
+		// El tenant no existe, crearlo
+		tenant = models.Tenant{
+			Name:        "Banco de Pruebas",
+			Code:        "test_bank",
+			Description: "Entidad crediticia para pruebas de desarrollo",
+			IsActive:    true,
+			Config:      `{"max_loan_amount": 50000000, "min_credit_score": 500}`,
+		}
+		if err := DB.Create(&tenant).Error; err != nil {
+			return err
+		}
 	}
 
-	log.Println("✅ Tablas eliminadas exitosamente")
-	return nil
-}
-
-// ResetDatabase elimina y vuelve a crear todas las tablas
-// ⚠️ CUIDADO: Solo usar en desarrollo
-func ResetDatabase() error {
-	log.Println("🔄 Reiniciando base de datos...")
-
-	// Eliminar tablas
-	if err := DropTables(); err != nil {
-		return err
+	// Crear tipo de préstamo de prueba
+	var loanType models.LoanType
+	result = DB.Where("tenant_id = ? AND code = ?", tenant.ID, "personal_loan").First(&loanType)
+	if result.Error != nil {
+		loanType = models.LoanType{
+			TenantID:    tenant.ID,
+			Name:        "Préstamo Personal",
+			Code:        "personal_loan",
+			Description: "Préstamo personal para gastos diversos",
+			IsActive:    true,
+			MinAmount:   100000,
+			MaxAmount:   10000000,
+		}
+		if err := DB.Create(&loanType).Error; err != nil {
+			return err
+		}
 	}
 
-	// Crear tablas nuevamente
-	if err := AutoMigrate(); err != nil {
-		return err
+	// Crear versión del tipo de préstamo
+	var loanTypeVersion models.LoanTypeVersion
+	result = DB.Where("loan_type_id = ? AND version = ?", loanType.ID, "1.0").First(&loanTypeVersion)
+	if result.Error != nil {
+		loanTypeVersion = models.LoanTypeVersion{
+			LoanTypeID:  loanType.ID,
+			Version:     "1.0",
+			Description: "Versión inicial del préstamo personal",
+			IsActive:    true,
+			IsDefault:   true,
+			Config:      `{"approval_rules": {"min_income": 1000000, "max_debt_ratio": 0.4}}`,
+		}
+		if err := DB.Create(&loanTypeVersion).Error; err != nil {
+			return err
+		}
 	}
 
-	log.Println("✅ Base de datos reiniciada exitosamente")
+	// Verificar si ya existen formularios para esta versión
+	var existingFormsCount int64
+	DB.Model(&models.LoanTypeForm{}).Where("loan_type_version_id = ?", loanTypeVersion.ID).Count(&existingFormsCount)
+
+	if existingFormsCount == 0 {
+		// Crear todos los formularios en una sola operación
+		forms := []models.LoanTypeForm{
+			{
+				LoanTypeVersionID: loanTypeVersion.ID,
+				Label:             "Información Personal",
+				Code:              "personal_info",
+				Description:       "Datos personales del solicitante",
+				Order:             1,
+				IsRequired:        true,
+				IsActive:          true,
+				Config:            `{"section": "personal"}`,
+			},
+			{
+				LoanTypeVersionID: loanTypeVersion.ID,
+				Label:             "Información Financiera",
+				Code:              "financial_info",
+				Description:       "Datos financieros del solicitante",
+				Order:             2,
+				IsRequired:        true,
+				IsActive:          true,
+				Config:            `{"section": "financial"}`,
+			},
+			{
+				LoanTypeVersionID: loanTypeVersion.ID,
+				Label:             "Detalles del Préstamo",
+				Code:              "loan_details",
+				Description:       "Información específica del préstamo solicitado",
+				Order:             3,
+				IsRequired:        true,
+				IsActive:          true,
+				Config:            `{"section": "loan"}`,
+			},
+		}
+
+		// Insertar todos los formularios de una vez
+		if err := DB.Create(&forms).Error; err != nil {
+			return err
+		}
+	}
+
+	// Obtener los formularios creados
+	var createdForms []models.LoanTypeForm
+	DB.Where("loan_type_version_id = ?", loanTypeVersion.ID).Find(&createdForms)
+
+	// Verificar si ya existen inputs
+	var existingInputsCount int64
+	formIDs := make([]uint, len(createdForms))
+	for i, form := range createdForms {
+		formIDs[i] = form.ID
+	}
+	DB.Model(&models.LoanTypeVersionFormInput{}).Where("loan_type_form_id IN ?", formIDs).Count(&existingInputsCount)
+
+	if existingInputsCount == 0 {
+		// Crear mapa de formularios por código para fácil acceso
+		formMap := make(map[string]uint)
+		for _, form := range createdForms {
+			formMap[form.Code] = form.ID
+		}
+
+		// Preparar todos los inputs de una vez
+		allInputs := []models.LoanTypeVersionFormInput{
+			// Inputs para Información Personal
+			{
+				LoanTypeFormID:  formMap["personal_info"],
+				Label:           "Nombre Completo",
+				Code:            "full_name",
+				InputType:       "text",
+				Placeholder:     "Ingrese su nombre completo",
+				ValidationRules: `{"required": true, "minLength": 2}`,
+				Order:           1,
+				IsRequired:      true,
+				IsActive:        true,
+			},
+			{
+				LoanTypeFormID:  formMap["personal_info"],
+				Label:           "Edad",
+				Code:            "age",
+				InputType:       "number",
+				Placeholder:     "Ingrese su edad",
+				ValidationRules: `{"required": true, "min": 18, "max": 75}`,
+				Order:           2,
+				IsRequired:      true,
+				IsActive:        true,
+			},
+			// Inputs para Información Financiera
+			{
+				LoanTypeFormID:  formMap["financial_info"],
+				Label:           "Ingresos Mensuales",
+				Code:            "monthly_income",
+				InputType:       "number",
+				Placeholder:     "Ingrese sus ingresos mensuales",
+				ValidationRules: `{"required": true, "min": 1000000}`,
+				Order:           1,
+				IsRequired:      true,
+				IsActive:        true,
+			},
+			{
+				LoanTypeFormID:  formMap["financial_info"],
+				Label:           "Gastos Mensuales",
+				Code:            "monthly_expenses",
+				InputType:       "number",
+				Placeholder:     "Ingrese sus gastos mensuales",
+				ValidationRules: `{"required": true, "min": 0}`,
+				Order:           2,
+				IsRequired:      true,
+				IsActive:        true,
+			},
+			// Inputs para Detalles del Préstamo
+			{
+				LoanTypeFormID:  formMap["loan_details"],
+				Label:           "Monto Solicitado",
+				Code:            "requested_amount",
+				InputType:       "number",
+				Placeholder:     "Ingrese el monto que desea solicitar",
+				ValidationRules: `{"required": true, "min": 100000, "max": 10000000}`,
+				Order:           1,
+				IsRequired:      true,
+				IsActive:        true,
+			},
+			{
+				LoanTypeFormID:  formMap["loan_details"],
+				Label:           "Propósito del Préstamo",
+				Code:            "purpose",
+				InputType:       "select",
+				Placeholder:     "Seleccione el propósito",
+				ValidationRules: `{"required": true}`,
+				Options:         `["Educación", "Vivienda", "Vehículo", "Consolidación de deudas", "Negocio", "Gastos médicos", "Otros"]`,
+				Order:           2,
+				IsRequired:      true,
+				IsActive:        true,
+			},
+		}
+
+		// Insertar todos los inputs de una vez
+		if err := DB.Create(&allInputs).Error; err != nil {
+			return err
+		}
+	}
+
+	log.Println("Datos iniciales insertados correctamente")
 	return nil
 }

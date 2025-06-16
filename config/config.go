@@ -2,6 +2,7 @@ package config
 
 import (
 	"log"
+	"time"
 
 	"github.com/spf13/viper"
 )
@@ -19,9 +20,11 @@ type Config struct {
 	ServerHost string `mapstructure:"SERVER_HOST"`
 	ServerPort string `mapstructure:"SERVER_PORT"`
 
-	// JWT
-	JWTSecret          string `mapstructure:"JWT_SECRET"`
-	JWTExpirationHours int    `mapstructure:"JWT_EXPIRATION_HOURS"`
+	// Token Configuration (RSA)
+	AccessTokenPrivateKey string `mapstructure:"ACCESS_TOKEN_PRIVATE_KEY"`
+	AccessTokenPublicKey  string `mapstructure:"ACCESS_TOKEN_PUBLIC_KEY"`
+	AccessTokenExpiresIn  string `mapstructure:"ACCESS_TOKEN_EXPIRED_IN"`
+	AccessTokenMaxAge     int    `mapstructure:"ACCESS_TOKEN_MAXAGE"`
 
 	// Aplicación
 	AppEnv     string `mapstructure:"APP_ENV"`
@@ -62,11 +65,14 @@ func LoadConfig(path string) (config Config, err error) {
 	if config.ServerPort == "" {
 		config.ServerPort = "8080"
 	}
-	if config.JWTSecret == "" {
-		log.Fatal("JWT_SECRET es requerido")
+	if config.AccessTokenPrivateKey == "" {
+		log.Fatal("ACCESS_TOKEN_PRIVATE_KEY es requerido")
 	}
-	if config.JWTExpirationHours == 0 {
-		config.JWTExpirationHours = 24
+	if config.AccessTokenExpiresIn == "" {
+		config.AccessTokenExpiresIn = "600m"
+	}
+	if config.AccessTokenMaxAge == 0 {
+		config.AccessTokenMaxAge = 43800
 	}
 
 	return config, nil
@@ -84,5 +90,35 @@ func (c *Config) GetServerAddress() string {
 
 // IsDevelopment verifica si la aplicación está en modo desarrollo
 func (c *Config) IsDevelopment() bool {
-	return c.AppEnv == "development"
+	return c.AppEnv == "local" || c.AppEnv == "dev"
+}
+
+// IsProduction verifica si la aplicación está en modo producción
+func (c *Config) IsProduction() bool {
+	return c.AppEnv == "prod"
+}
+
+// IsLocal verifica si la aplicación está en modo local
+func (c *Config) IsLocal() bool {
+	return c.AppEnv == "local"
+}
+
+// IsQA verifica si la aplicación está en modo QA
+func (c *Config) IsQA() bool {
+	return c.AppEnv == "qa"
+}
+
+// GetEnvironment retorna el entorno actual
+func (c *Config) GetEnvironment() string {
+	return c.AppEnv
+}
+
+// UseRSATokens verifica si debe usar tokens RSA
+func (c *Config) UseRSATokens() bool {
+	return c.AccessTokenPrivateKey != "" && c.AccessTokenPublicKey != ""
+}
+
+// GetTokenExpirationDuration retorna la duración de expiración del token
+func (c *Config) GetTokenExpirationDuration() (time.Duration, error) {
+	return time.ParseDuration(c.AccessTokenExpiresIn)
 }

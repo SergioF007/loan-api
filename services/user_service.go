@@ -2,22 +2,21 @@ package services
 
 import (
 	"loan-api/app_error"
+	"loan-api/config"
 	"loan-api/models"
 	"loan-api/repositories"
+	"loan-api/utils"
 
 	"github.com/go-playground/validator/v10"
+	"golang.org/x/crypto/bcrypt"
 )
 
 // UserService define la interfaz para la lógica de negocio de usuarios
 type UserService interface {
-	CreateUser(req *models.UserRequest) (*models.User, error)
-	GetUserByID(id uint) (*models.User, error)
-	GetUserByEmail(email string) (*models.User, error)
-	UpdateUser(id uint, req *models.UserRequest) (*models.User, error)
-	DeleteUser(id uint) error
-	ListUsers(page, limit int) ([]models.User, int64, error)
-	ValidateUser(req *models.UserRequest) error
-	GetUserCreditSummary(userID uint) (map[string]interface{}, error)
+	RegisterUser(req *models.RegisterRequest, tenantID uint) (*models.User, error)
+	Login(req *models.LoginRequest, tenantID uint, cfg *config.Config) (*models.LoginResponse, error)
+	ValidateRegister(req *models.RegisterRequest) error
+	ValidateLogin(req *models.LoginRequest) error
 }
 
 // userService implementa UserService
@@ -34,10 +33,10 @@ func NewUserService(userRepo repositories.UserRepository) UserService {
 	}
 }
 
-// CreateUser crea un nuevo usuario
-func (s *userService) CreateUser(req *models.UserRequest) (*models.User, error) {
+// RegisterUser registra un nuevo usuario
+func (s *userService) RegisterUser(req *models.RegisterRequest, tenantID uint) (*models.User, error) {
 	// Validar datos de entrada
-	if err := s.ValidateUser(req); err != nil {
+	if err := s.ValidateRegister(req); err != nil {
 		return nil, err
 	}
 
@@ -50,18 +49,35 @@ func (s *userService) CreateUser(req *models.UserRequest) (*models.User, error) 
 		return nil, app_error.ErrEmailExists
 	}
 
+	// Verificar si el documento ya existe
+	exists, err = s.userRepo.ExistsByDocument(req.DocumentType, req.DocumentNumber)
+	if err != nil {
+		return nil, err
+	}
+	if exists {
+		return nil, app_error.NewValidationError("document", "Ya existe un usuario con este documento")
+	}
+
 	// Validar lógica de negocio
-	if err := s.validateUserBusinessRules(req); err != nil {
+	if err := s.validateRegisterBusinessRules(req); err != nil {
 		return nil, err
 	}
 
-	// Crear modelo de usuario
+	// Hash de la contraseña
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
+	if err != nil {
+		return nil, app_error.NewDatabaseError("hash contraseña", err.Error())
+	}
+
+	// Crear modelo de usuario con tenant_id
 	user := &models.User{
-		Name:        req.Name,
-		Email:       req.Email,
-		Phone:       req.Phone,
-		Income:      req.Income,
-		CreditScore: req.CreditScore,
+		TenantID:       tenantID,
+		Name:           req.Name,
+		Email:          req.Email,
+		Phone:          req.Phone,
+		DocumentType:   req.DocumentType,
+		DocumentNumber: req.DocumentNumber,
+		Password:       string(hashedPassword),
 	}
 
 	// Guardar en base de datos
@@ -72,107 +88,46 @@ func (s *userService) CreateUser(req *models.UserRequest) (*models.User, error) 
 	return user, nil
 }
 
-// GetUserByID obtiene un usuario por su ID
-func (s *userService) GetUserByID(id uint) (*models.User, error) {
-	if id == 0 {
-		return nil, app_error.NewValidationError("id", "ID de usuario es requerido")
-	}
-
-	return s.userRepo.GetByID(id)
-}
-
-// GetUserByEmail obtiene un usuario por su email
-func (s *userService) GetUserByEmail(email string) (*models.User, error) {
-	if email == "" {
-		return nil, app_error.NewValidationError("email", "Email es requerido")
-	}
-
-	return s.userRepo.GetByEmail(email)
-}
-
-// UpdateUser actualiza un usuario existente
-func (s *userService) UpdateUser(id uint, req *models.UserRequest) (*models.User, error) {
-	// Validar ID
-	if id == 0 {
-		return nil, app_error.NewValidationError("id", "ID de usuario es requerido")
-	}
-
+// Login autentica un usuario
+func (s *userService) Login(req *models.LoginRequest, tenantID uint, cfg *config.Config) (*models.LoginResponse, error) {
 	// Validar datos de entrada
-	if err := s.ValidateUser(req); err != nil {
+	if err := s.ValidateLogin(req); err != nil {
 		return nil, err
 	}
 
-	// Verificar que el usuario existe
-	existingUser, err := s.userRepo.GetByID(id)
+	// Buscar usuario por email
+	user, err := s.userRepo.GetByEmail(req.Email)
 	if err != nil {
-		return nil, err
+		return nil, app_error.NewValidationError("credentials", "Email o contraseña incorrectos")
 	}
 
-	// Verificar si el email ya existe en otro usuario
-	if req.Email != existingUser.Email {
-		exists, err := s.userRepo.ExistsByEmail(req.Email)
-		if err != nil {
-			return nil, err
-		}
-		if exists {
-			return nil, app_error.ErrEmailExists
-		}
+	// Verificar que el usuario pertenezca al tenant correcto
+	if user.TenantID != tenantID {
+		return nil, app_error.NewValidationError("credentials", "Usuario no pertenece a este tenant")
 	}
 
-	// Validar lógica de negocio
-	if err := s.validateUserBusinessRules(req); err != nil {
-		return nil, err
+	// Verificar contraseña
+	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(req.Password)); err != nil {
+		return nil, app_error.NewValidationError("credentials", "Email o contraseña incorrectos")
 	}
 
-	// Actualizar campos
-	existingUser.Name = req.Name
-	existingUser.Email = req.Email
-	existingUser.Phone = req.Phone
-	existingUser.Income = req.Income
-	existingUser.CreditScore = req.CreditScore
-
-	// Guardar cambios
-	if err := s.userRepo.Update(existingUser); err != nil {
-		return nil, err
-	}
-
-	return existingUser, nil
-}
-
-// DeleteUser elimina un usuario
-func (s *userService) DeleteUser(id uint) error {
-	if id == 0 {
-		return app_error.NewValidationError("id", "ID de usuario es requerido")
-	}
-
-	// Verificar que el usuario existe
-	_, err := s.userRepo.GetByID(id)
+	// Generar token JWT
+	token, err := utils.GenerateAccessToken(user, cfg)
 	if err != nil {
-		return err
+		return nil, app_error.NewDatabaseError("generar token", err.Error())
 	}
 
-	// TODO: Verificar si el usuario tiene préstamos activos
-	// Esto se puede implementar cuando se tenga el loan service
+	// Crear respuesta
+	response := &models.LoginResponse{
+		User:  user.ToResponse(),
+		Token: token,
+	}
 
-	return s.userRepo.Delete(id)
+	return response, nil
 }
 
-// ListUsers obtiene una lista paginada de usuarios
-func (s *userService) ListUsers(page, limit int) ([]models.User, int64, error) {
-	// Validar parámetros de paginación
-	if page < 1 {
-		page = 1
-	}
-	if limit < 1 || limit > 100 {
-		limit = 20 // Límite por defecto
-	}
-
-	offset := (page - 1) * limit
-	return s.userRepo.List(limit, offset)
-}
-
-// ValidateUser valida los datos de un usuario
-func (s *userService) ValidateUser(req *models.UserRequest) error {
+// ValidateRegister valida los datos de registro de un usuario
+func (s *userService) ValidateRegister(req *models.RegisterRequest) error {
 	if err := s.validator.Struct(req); err != nil {
 		// Procesar errores de validación
 		var validationErrors []string
@@ -196,64 +151,38 @@ func (s *userService) ValidateUser(req *models.UserRequest) error {
 	return nil
 }
 
-// validateUserBusinessRules valida reglas de negocio específicas
-func (s *userService) validateUserBusinessRules(req *models.UserRequest) error {
-	// Validar puntaje crediticio
-	if req.CreditScore < 300 || req.CreditScore > 850 {
-		return app_error.NewBusinessError(
-			"Puntaje crediticio inválido",
-			"El puntaje crediticio debe estar entre 300 y 850",
-		)
-	}
+// ValidateLogin valida los datos de login de un usuario
+func (s *userService) ValidateLogin(req *models.LoginRequest) error {
+	if err := s.validator.Struct(req); err != nil {
+		// Procesar errores de validación
+		var validationErrors []string
+		for _, err := range err.(validator.ValidationErrors) {
+			switch err.Tag() {
+			case "required":
+				validationErrors = append(validationErrors, err.Field()+" es requerido")
+			case "email":
+				validationErrors = append(validationErrors, "Email debe tener un formato válido")
+			default:
+				validationErrors = append(validationErrors, err.Field()+" no es válido")
+			}
+		}
 
-	// Validar ingresos mínimos
-	if req.Income < 0 {
-		return app_error.NewBusinessError(
-			"Ingresos inválidos",
-			"Los ingresos no pueden ser negativos",
-		)
+		return app_error.NewValidationError("validación", validationErrors[0])
 	}
-
-	// Validar formato de teléfono básico
-	if len(req.Phone) < 10 {
-		return app_error.NewBusinessError(
-			"Teléfono inválido",
-			"El teléfono debe tener al menos 10 dígitos",
-		)
-	}
-
 	return nil
 }
 
-// GetUserCreditSummary obtiene un resumen crediticio del usuario (método adicional)
-func (s *userService) GetUserCreditSummary(userID uint) (map[string]interface{}, error) {
-	user, err := s.userRepo.GetByID(userID)
-	if err != nil {
-		return nil, err
+// validateRegisterBusinessRules valida reglas de negocio específicas para el registro
+func (s *userService) validateRegisterBusinessRules(req *models.RegisterRequest) error {
+	// Validar confirmación de contraseña
+	if req.Password != req.PasswordConfirmation {
+		return app_error.NewValidationError("password_confirmation", "Las contraseñas no coinciden")
 	}
 
-	summary := map[string]interface{}{
-		"user_id":      user.ID,
-		"name":         user.Name,
-		"credit_score": user.CreditScore,
-		"income":       user.Income,
-		"status":       s.getCreditStatus(user.CreditScore),
+	// Validar tipo de documento
+	if !models.IsValidDocumentType(req.DocumentType) {
+		return app_error.NewValidationError("document_type", "Tipo de documento inválido")
 	}
 
-	return summary, nil
-}
-
-// getCreditStatus determina el estado crediticio basado en el puntaje
-func (s *userService) getCreditStatus(score int) string {
-	if score >= 750 {
-		return "Excelente"
-	} else if score >= 700 {
-		return "Muy Bueno"
-	} else if score >= 650 {
-		return "Bueno"
-	} else if score >= 600 {
-		return "Regular"
-	} else {
-		return "Pobre"
-	}
+	return nil
 }

@@ -24,9 +24,9 @@ const docTemplate = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
-        "/api/v1/loans": {
-            "get": {
-                "description": "Obtiene una lista paginada de préstamos con información del usuario",
+        "/auth/login": {
+            "post": {
+                "description": "Autentica un usuario y retorna un token JWT",
                 "consumes": [
                     "application/json"
                 ],
@@ -34,23 +34,18 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "loans"
+                    "auth"
                 ],
-                "summary": "Listar préstamos",
+                "summary": "Iniciar sesión",
                 "parameters": [
                     {
-                        "type": "integer",
-                        "default": 1,
-                        "description": "Número de página",
-                        "name": "page",
-                        "in": "query"
-                    },
-                    {
-                        "type": "integer",
-                        "default": 20,
-                        "description": "Elementos por página",
-                        "name": "limit",
-                        "in": "query"
+                        "description": "Credenciales del usuario",
+                        "name": "credentials",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/models.LoginRequest"
+                        }
                     }
                 ],
                 "responses": {
@@ -59,7 +54,138 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/utils.PaginatedResponse"
+                                    "$ref": "#/definitions/utils.APIResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/models.LoginResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/utils.APIResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/utils.APIResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/utils.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/auth/register": {
+            "post": {
+                "description": "Registra un nuevo usuario en el sistema",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Registrar un nuevo usuario",
+                "parameters": [
+                    {
+                        "description": "Datos del usuario",
+                        "name": "user",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/models.RegisterRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/utils.APIResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/models.UserResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/utils.APIResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/utils.APIResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/utils.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/loan-types": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Obtiene todos los tipos de préstamo con sus formularios e inputs disponibles para un tenant",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "loan-types"
+                ],
+                "summary": "Obtener tipos de préstamo con formularios",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "ID del tenant",
+                        "name": "X-Tenant-ID",
+                        "in": "header",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/utils.APIResponse"
                                 },
                                 {
                                     "type": "object",
@@ -67,7 +193,7 @@ const docTemplate = `{
                                         "data": {
                                             "type": "array",
                                             "items": {
-                                                "$ref": "#/definitions/models.LoanResponse"
+                                                "$ref": "#/definitions/models.LoanTypeResponse"
                                             }
                                         }
                                     }
@@ -81,6 +207,18 @@ const docTemplate = `{
                             "$ref": "#/definitions/utils.APIResponse"
                         }
                     },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/utils.APIResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/utils.APIResponse"
+                        }
+                    },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
@@ -88,9 +226,96 @@ const docTemplate = `{
                         }
                     }
                 }
-            },
+            }
+        },
+        "/loan-types/{code}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Obtiene un tipo de préstamo específico con sus formularios e inputs por código",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "loan-types"
+                ],
+                "summary": "Obtener tipo de préstamo por código",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "ID del tenant",
+                        "name": "X-Tenant-ID",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Código del tipo de préstamo",
+                        "name": "code",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/utils.APIResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/models.LoanTypeResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/utils.APIResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/utils.APIResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/utils.APIResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/utils.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/loans": {
             "post": {
-                "description": "Crea una nueva solicitud de préstamo en el sistema",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Crea una nueva solicitud de préstamo para un usuario autenticado",
                 "consumes": [
                     "application/json"
                 ],
@@ -103,12 +328,19 @@ const docTemplate = `{
                 "summary": "Crear una nueva solicitud de préstamo",
                 "parameters": [
                     {
-                        "description": "Datos del préstamo",
+                        "type": "string",
+                        "description": "ID del tenant",
+                        "name": "X-Tenant-ID",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "description": "Datos de la solicitud de préstamo",
                         "name": "loan",
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/models.LoanRequest"
+                            "$ref": "#/definitions/models.CreateLoanRequest"
                         }
                     }
                 ],
@@ -137,6 +369,12 @@ const docTemplate = `{
                             "$ref": "#/definitions/utils.APIResponse"
                         }
                     },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/utils.APIResponse"
+                        }
+                    },
                     "404": {
                         "description": "Not Found",
                         "schema": {
@@ -152,51 +390,14 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/v1/loans/statistics": {
-            "get": {
-                "description": "Obtiene estadísticas generales de préstamos del sistema",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "loans"
-                ],
-                "summary": "Obtener estadísticas de préstamos",
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/utils.APIResponse"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "type": "object",
-                                            "additionalProperties": true
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/utils.APIResponse"
-                        }
+        "/loans/data": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
                     }
-                }
-            }
-        },
-        "/api/v1/loans/status": {
-            "get": {
-                "description": "Obtiene una lista paginada de préstamos filtrados por estado",
+                ],
+                "description": "Guarda los datos dinámicos de una solicitud de préstamo existente",
                 "consumes": [
                     "application/json"
                 ],
@@ -206,50 +407,30 @@ const docTemplate = `{
                 "tags": [
                     "loans"
                 ],
-                "summary": "Obtener préstamos por estado",
+                "summary": "Guardar datos de una solicitud de préstamo",
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Estado del préstamo (pending, approved, rejected)",
-                        "name": "status",
-                        "in": "query",
+                        "description": "ID del tenant",
+                        "name": "X-Tenant-ID",
+                        "in": "header",
                         "required": true
                     },
                     {
-                        "type": "integer",
-                        "default": 1,
-                        "description": "Número de página",
-                        "name": "page",
-                        "in": "query"
-                    },
-                    {
-                        "type": "integer",
-                        "default": 20,
-                        "description": "Elementos por página",
-                        "name": "limit",
-                        "in": "query"
+                        "description": "Datos del préstamo a guardar",
+                        "name": "data",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/models.SaveLoanDataRequest"
+                        }
                     }
                 ],
                 "responses": {
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/utils.PaginatedResponse"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "type": "array",
-                                            "items": {
-                                                "$ref": "#/definitions/models.LoanResponse"
-                                            }
-                                        }
-                                    }
-                                }
-                            ]
+                            "$ref": "#/definitions/utils.APIResponse"
                         }
                     },
                     "400": {
@@ -258,6 +439,18 @@ const docTemplate = `{
                             "$ref": "#/definitions/utils.APIResponse"
                         }
                     },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/utils.APIResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/utils.APIResponse"
+                        }
+                    },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
@@ -267,9 +460,14 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/v1/loans/user/{userId}": {
+        "/loans/user": {
             "get": {
-                "description": "Obtiene una lista paginada de préstamos de un usuario específico",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Obtiene todos los préstamos de un usuario autenticado",
                 "consumes": [
                     "application/json"
                 ],
@@ -282,25 +480,11 @@ const docTemplate = `{
                 "summary": "Obtener préstamos de un usuario",
                 "parameters": [
                     {
-                        "type": "integer",
-                        "description": "ID del usuario",
-                        "name": "userId",
-                        "in": "path",
+                        "type": "string",
+                        "description": "ID del tenant",
+                        "name": "X-Tenant-ID",
+                        "in": "header",
                         "required": true
-                    },
-                    {
-                        "type": "integer",
-                        "default": 1,
-                        "description": "Número de página",
-                        "name": "page",
-                        "in": "query"
-                    },
-                    {
-                        "type": "integer",
-                        "default": 20,
-                        "description": "Elementos por página",
-                        "name": "limit",
-                        "in": "query"
                     }
                 ],
                 "responses": {
@@ -309,7 +493,7 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/utils.PaginatedResponse"
+                                    "$ref": "#/definitions/utils.APIResponse"
                                 },
                                 {
                                     "type": "object",
@@ -331,6 +515,12 @@ const docTemplate = `{
                             "$ref": "#/definitions/utils.APIResponse"
                         }
                     },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/utils.APIResponse"
+                        }
+                    },
                     "404": {
                         "description": "Not Found",
                         "schema": {
@@ -346,9 +536,14 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/v1/loans/{id}": {
+        "/loans/{id}": {
             "get": {
-                "description": "Obtiene la información de un préstamo por su ID",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Obtiene la información completa de un préstamo por ID",
                 "consumes": [
                     "application/json"
                 ],
@@ -358,8 +553,15 @@ const docTemplate = `{
                 "tags": [
                     "loans"
                 ],
-                "summary": "Obtener préstamo por ID",
+                "summary": "Obtener información de un préstamo",
                 "parameters": [
+                    {
+                        "type": "string",
+                        "description": "ID del tenant",
+                        "name": "X-Tenant-ID",
+                        "in": "header",
+                        "required": true
+                    },
                     {
                         "type": "integer",
                         "description": "ID del préstamo",
@@ -393,52 +595,8 @@ const docTemplate = `{
                             "$ref": "#/definitions/utils.APIResponse"
                         }
                     },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/utils.APIResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/utils.APIResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/api/v1/loans/{id}/process": {
-            "post": {
-                "description": "Procesa la aprobación automática de un préstamo basado en criterios predefinidos",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "loans"
-                ],
-                "summary": "Procesar aprobación automática de préstamo",
-                "parameters": [
-                    {
-                        "type": "integer",
-                        "description": "ID del préstamo",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/utils.APIResponse"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
+                    "401": {
+                        "description": "Unauthorized",
                         "schema": {
                             "$ref": "#/definitions/utils.APIResponse"
                         }
@@ -458,9 +616,9 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/v1/loans/{id}/status": {
-            "put": {
-                "description": "Actualiza el estado de un préstamo (pending, approved, rejected)",
+        "/tenants": {
+            "get": {
+                "description": "Obtiene todos los tenants disponibles para pruebas",
                 "consumes": [
                     "application/json"
                 ],
@@ -468,27 +626,9 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "loans"
+                    "tenants"
                 ],
-                "summary": "Actualizar estado del préstamo",
-                "parameters": [
-                    {
-                        "type": "integer",
-                        "description": "ID del préstamo",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "description": "Nuevo estado del préstamo",
-                        "name": "status",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/models.LoanStatusUpdateRequest"
-                        }
-                    }
-                ],
+                "summary": "Obtener tenants disponibles",
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -496,75 +636,6 @@ const docTemplate = `{
                             "allOf": [
                                 {
                                     "$ref": "#/definitions/utils.APIResponse"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/models.LoanResponse"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/utils.APIResponse"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/utils.APIResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/utils.APIResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/api/v1/users": {
-            "get": {
-                "description": "Obtiene una lista paginada de usuarios",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "users"
-                ],
-                "summary": "Listar usuarios",
-                "parameters": [
-                    {
-                        "type": "integer",
-                        "default": 1,
-                        "description": "Número de página",
-                        "name": "page",
-                        "in": "query"
-                    },
-                    {
-                        "type": "integer",
-                        "default": 20,
-                        "description": "Elementos por página",
-                        "name": "limit",
-                        "in": "query"
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/utils.PaginatedResponse"
                                 },
                                 {
                                     "type": "object",
@@ -572,390 +643,12 @@ const docTemplate = `{
                                         "data": {
                                             "type": "array",
                                             "items": {
-                                                "$ref": "#/definitions/models.UserResponse"
+                                                "$ref": "#/definitions/models.TenantResponse"
                                             }
                                         }
                                     }
                                 }
                             ]
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/utils.APIResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/utils.APIResponse"
-                        }
-                    }
-                }
-            },
-            "post": {
-                "description": "Crea un nuevo usuario en el sistema",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "users"
-                ],
-                "summary": "Crear un nuevo usuario",
-                "parameters": [
-                    {
-                        "description": "Datos del usuario",
-                        "name": "user",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/models.UserRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "201": {
-                        "description": "Created",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/utils.APIResponse"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/models.UserResponse"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/utils.APIResponse"
-                        }
-                    },
-                    "409": {
-                        "description": "Conflict",
-                        "schema": {
-                            "$ref": "#/definitions/utils.APIResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/utils.APIResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/api/v1/users/search": {
-            "get": {
-                "description": "Obtiene la información de un usuario por su email",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "users"
-                ],
-                "summary": "Obtener usuario por email",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Email del usuario",
-                        "name": "email",
-                        "in": "query",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/utils.APIResponse"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/models.UserResponse"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/utils.APIResponse"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/utils.APIResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/utils.APIResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/api/v1/users/{id}": {
-            "get": {
-                "description": "Obtiene la información de un usuario por su ID",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "users"
-                ],
-                "summary": "Obtener usuario por ID",
-                "parameters": [
-                    {
-                        "type": "integer",
-                        "description": "ID del usuario",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/utils.APIResponse"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/models.UserResponse"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/utils.APIResponse"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/utils.APIResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/utils.APIResponse"
-                        }
-                    }
-                }
-            },
-            "put": {
-                "description": "Actualiza la información de un usuario existente",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "users"
-                ],
-                "summary": "Actualizar usuario por ID",
-                "parameters": [
-                    {
-                        "type": "integer",
-                        "description": "ID del usuario",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "description": "Datos actualizados del usuario",
-                        "name": "user",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/models.UserRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/utils.APIResponse"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/models.UserResponse"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/utils.APIResponse"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/utils.APIResponse"
-                        }
-                    },
-                    "409": {
-                        "description": "Conflict",
-                        "schema": {
-                            "$ref": "#/definitions/utils.APIResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/utils.APIResponse"
-                        }
-                    }
-                }
-            },
-            "delete": {
-                "description": "Elimina un usuario del sistema (soft delete)",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "users"
-                ],
-                "summary": "Eliminar usuario por ID",
-                "parameters": [
-                    {
-                        "type": "integer",
-                        "description": "ID del usuario",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/utils.APIResponse"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/utils.APIResponse"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/utils.APIResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/utils.APIResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/api/v1/users/{id}/credit-summary": {
-            "get": {
-                "description": "Obtiene un resumen del estado crediticio de un usuario",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "users"
-                ],
-                "summary": "Obtener resumen crediticio del usuario",
-                "parameters": [
-                    {
-                        "type": "integer",
-                        "description": "ID del usuario",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/utils.APIResponse"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "type": "object",
-                                            "additionalProperties": true
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/utils.APIResponse"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/utils.APIResponse"
                         }
                     },
                     "500": {
@@ -969,234 +662,336 @@ const docTemplate = `{
         }
     },
     "definitions": {
-        "models.Loan": {
+        "models.CreateLoanRequest": {
             "type": "object",
             "required": [
-                "amount",
-                "purpose",
-                "user_id"
+                "loan_type_id"
             ],
             "properties": {
-                "amount": {
-                    "type": "number",
-                    "minimum": 1
-                },
-                "approval_date": {
-                    "type": "string"
-                },
-                "created_at": {
-                    "type": "string"
-                },
-                "id": {
-                    "type": "integer"
-                },
-                "purpose": {
-                    "type": "string",
-                    "maxLength": 500,
-                    "minLength": 10
-                },
-                "request_date": {
-                    "type": "string"
-                },
-                "status": {
-                    "enum": [
-                        "pending",
-                        "approved",
-                        "rejected"
-                    ],
-                    "allOf": [
-                        {
-                            "$ref": "#/definitions/models.LoanStatus"
-                        }
-                    ]
-                },
-                "updated_at": {
-                    "type": "string"
-                },
-                "user": {
-                    "description": "Relación con User (evitamos referencia circular con puntero)",
-                    "allOf": [
-                        {
-                            "$ref": "#/definitions/models.User"
-                        }
-                    ]
-                },
-                "user_id": {
+                "loan_type_id": {
                     "type": "integer"
                 }
             }
         },
-        "models.LoanRequest": {
+        "models.DocumentType": {
+            "type": "string",
+            "enum": [
+                "cedula",
+                "pasaporte",
+                "tarjeta_identidad"
+            ],
+            "x-enum-varnames": [
+                "DocumentTypeCedula",
+                "DocumentTypePasaporte",
+                "DocumentTypeTarjetaIdentidad"
+            ]
+        },
+        "models.LoanDataItemRequest": {
             "type": "object",
             "required": [
-                "amount",
-                "purpose",
-                "user_id"
+                "form_id",
+                "key",
+                "value"
             ],
             "properties": {
-                "amount": {
-                    "type": "number",
-                    "minimum": 1
-                },
-                "purpose": {
-                    "type": "string",
-                    "maxLength": 500,
-                    "minLength": 10
-                },
-                "user_id": {
+                "form_id": {
                     "type": "integer"
+                },
+                "index": {
+                    "type": "integer"
+                },
+                "key": {
+                    "type": "string"
+                },
+                "value": {
+                    "type": "string"
+                }
+            }
+        },
+        "models.LoanDataResponse": {
+            "type": "object",
+            "properties": {
+                "form_id": {
+                    "type": "integer"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "index": {
+                    "type": "integer"
+                },
+                "key": {
+                    "type": "string"
+                },
+                "value": {
+                    "type": "string"
                 }
             }
         },
         "models.LoanResponse": {
             "type": "object",
             "properties": {
-                "amount": {
+                "amount_approved": {
                     "type": "number"
-                },
-                "approval_date": {
-                    "type": "string"
                 },
                 "created_at": {
                     "type": "string"
                 },
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.LoanDataResponse"
+                    }
+                },
                 "id": {
                     "type": "integer"
                 },
-                "purpose": {
-                    "type": "string"
+                "loan_type": {
+                    "$ref": "#/definitions/models.LoanTypeResponse"
                 },
-                "request_date": {
+                "loan_type_id": {
+                    "type": "integer"
+                },
+                "observation": {
                     "type": "string"
                 },
                 "status": {
-                    "$ref": "#/definitions/models.LoanStatus"
+                    "type": "string"
                 },
                 "updated_at": {
                     "type": "string"
                 },
                 "user": {
-                    "$ref": "#/definitions/models.User"
+                    "$ref": "#/definitions/models.UserResponse"
                 },
                 "user_id": {
                     "type": "integer"
                 }
             }
         },
-        "models.LoanStatus": {
-            "type": "string",
-            "enum": [
-                "pending",
-                "approved",
-                "rejected"
-            ],
-            "x-enum-varnames": [
-                "LoanStatusPending",
-                "LoanStatusApproved",
-                "LoanStatusRejected"
-            ]
-        },
-        "models.LoanStatusUpdateRequest": {
+        "models.LoanTypeFormResponse": {
             "type": "object",
-            "required": [
-                "status"
-            ],
             "properties": {
-                "status": {
-                    "enum": [
-                        "pending",
-                        "approved",
-                        "rejected"
-                    ],
-                    "allOf": [
-                        {
-                            "$ref": "#/definitions/models.LoanStatus"
-                        }
-                    ]
+                "code": {
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "form_inputs": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.LoanTypeVersionFormInputResponse"
+                    }
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "is_required": {
+                    "type": "boolean"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "order": {
+                    "type": "integer"
                 }
             }
         },
-        "models.User": {
+        "models.LoanTypeResponse": {
             "type": "object",
-            "required": [
-                "credit_score",
-                "email",
-                "income",
-                "name",
-                "phone"
-            ],
             "properties": {
-                "created_at": {
+                "code": {
                     "type": "string"
                 },
-                "credit_score": {
-                    "type": "integer",
-                    "maximum": 850,
-                    "minimum": 300
-                },
-                "email": {
+                "description": {
                     "type": "string"
                 },
                 "id": {
                     "type": "integer"
                 },
-                "income": {
-                    "type": "number",
-                    "minimum": 0
+                "max_amount": {
+                    "type": "number"
                 },
-                "loans": {
-                    "description": "Relaciones",
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/models.Loan"
-                    }
+                "min_amount": {
+                    "type": "number"
                 },
                 "name": {
-                    "type": "string",
-                    "maxLength": 100,
-                    "minLength": 2
+                    "type": "string"
                 },
-                "phone": {
-                    "type": "string",
-                    "maxLength": 20,
-                    "minLength": 10
+                "version": {
+                    "$ref": "#/definitions/models.LoanTypeVersionResponse"
+                }
+            }
+        },
+        "models.LoanTypeVersionFormInputResponse": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string"
                 },
-                "updated_at": {
+                "default_value": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "input_type": {
+                    "type": "string"
+                },
+                "is_required": {
+                    "type": "boolean"
+                },
+                "label": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "options": {
+                    "type": "string"
+                },
+                "order": {
+                    "type": "integer"
+                },
+                "placeholder": {
+                    "type": "string"
+                },
+                "validation_rules": {
                     "type": "string"
                 }
             }
         },
-        "models.UserRequest": {
+        "models.LoanTypeVersionResponse": {
+            "type": "object",
+            "properties": {
+                "description": {
+                    "type": "string"
+                },
+                "form_inputs": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.LoanTypeVersionFormInputResponse"
+                    }
+                },
+                "forms": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.LoanTypeFormResponse"
+                    }
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "version": {
+                    "type": "string"
+                }
+            }
+        },
+        "models.LoginRequest": {
             "type": "object",
             "required": [
-                "credit_score",
                 "email",
-                "income",
-                "name",
-                "phone"
+                "password"
             ],
             "properties": {
-                "credit_score": {
-                    "type": "integer",
-                    "maximum": 850,
-                    "minimum": 300
-                },
                 "email": {
                     "type": "string"
                 },
-                "income": {
-                    "type": "number",
-                    "minimum": 0
+                "password": {
+                    "type": "string"
+                }
+            }
+        },
+        "models.LoginResponse": {
+            "type": "object",
+            "properties": {
+                "token": {
+                    "type": "string"
+                },
+                "user": {
+                    "$ref": "#/definitions/models.UserResponse"
+                }
+            }
+        },
+        "models.RegisterRequest": {
+            "type": "object",
+            "required": [
+                "document_number",
+                "document_type",
+                "email",
+                "name",
+                "password",
+                "password_confirmation",
+                "phone"
+            ],
+            "properties": {
+                "document_number": {
+                    "type": "string",
+                    "maxLength": 20,
+                    "minLength": 5
+                },
+                "document_type": {
+                    "$ref": "#/definitions/models.DocumentType"
+                },
+                "email": {
+                    "type": "string"
                 },
                 "name": {
                     "type": "string",
                     "maxLength": 100,
                     "minLength": 2
                 },
+                "password": {
+                    "type": "string",
+                    "minLength": 8
+                },
+                "password_confirmation": {
+                    "type": "string",
+                    "minLength": 8
+                },
                 "phone": {
                     "type": "string",
                     "maxLength": 20,
                     "minLength": 10
+                }
+            }
+        },
+        "models.SaveLoanDataRequest": {
+            "type": "object",
+            "required": [
+                "data",
+                "loan_id"
+            ],
+            "properties": {
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.LoanDataItemRequest"
+                    }
+                },
+                "loan_id": {
+                    "type": "integer"
+                }
+            }
+        },
+        "models.TenantResponse": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "is_active": {
+                    "type": "boolean"
+                },
+                "name": {
+                    "type": "string"
                 }
             }
         },
@@ -1206,17 +1001,17 @@ const docTemplate = `{
                 "created_at": {
                     "type": "string"
                 },
-                "credit_score": {
-                    "type": "integer"
+                "document_number": {
+                    "type": "string"
+                },
+                "document_type": {
+                    "$ref": "#/definitions/models.DocumentType"
                 },
                 "email": {
                     "type": "string"
                 },
                 "id": {
                     "type": "integer"
-                },
-                "income": {
-                    "type": "number"
                 },
                 "name": {
                     "type": "string"
@@ -1257,48 +1052,10 @@ const docTemplate = `{
                     "type": "string"
                 }
             }
-        },
-        "utils.PaginatedResponse": {
-            "type": "object",
-            "properties": {
-                "data": {},
-                "message": {
-                    "type": "string"
-                },
-                "pagination": {
-                    "$ref": "#/definitions/utils.Pagination"
-                },
-                "success": {
-                    "type": "boolean"
-                }
-            }
-        },
-        "utils.Pagination": {
-            "type": "object",
-            "properties": {
-                "has_next": {
-                    "type": "boolean"
-                },
-                "has_prev": {
-                    "type": "boolean"
-                },
-                "limit": {
-                    "type": "integer"
-                },
-                "page": {
-                    "type": "integer"
-                },
-                "total": {
-                    "type": "integer"
-                },
-                "total_pages": {
-                    "type": "integer"
-                }
-            }
         }
     },
     "securityDefinitions": {
-        "Bearer": {
+        "BearerAuth": {
             "description": "Type \"Bearer\" followed by a space and JWT token.",
             "type": "apiKey",
             "name": "Authorization",
@@ -1311,7 +1068,7 @@ const docTemplate = `{
 var SwaggerInfo = &swag.Spec{
 	Version:          "1.0",
 	Host:             "localhost:8080",
-	BasePath:         "/api/v1",
+	BasePath:         "/loan-api/api/v1",
 	Schemes:          []string{},
 	Title:            "Loan API",
 	Description:      "API REST para gestión de solicitudes de préstamos",

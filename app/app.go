@@ -1,8 +1,7 @@
-package main
+package app
 
 import (
 	"fmt"
-	"log"
 	"regexp"
 	"strings"
 	"time"
@@ -11,29 +10,17 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
 	"github.com/go-playground/validator/v10"
-	swaggerFiles "github.com/swaggo/files"
-	ginSwagger "github.com/swaggo/gin-swagger"
-	"gorm.io/gorm"
 
 	"loan-api/config"
 	"loan-api/controllers"
 	"loan-api/database"
-	_ "loan-api/docs"
 	"loan-api/middlewares"
 	"loan-api/repositories"
 	"loan-api/routers"
 	"loan-api/services"
 )
 
-type Server struct {
-	DB     *gorm.DB
-	Config config.Config
-}
-
-var (
-	server *gin.Engine
-)
-
+// Validadores personalizados
 var alphaValidation validator.Func = func(fl validator.FieldLevel) bool {
 	value, ok := fl.Field().Interface().(string)
 	if ok {
@@ -79,7 +66,6 @@ var passwordValidation validator.Func = func(fl validator.FieldLevel) bool {
 	return false
 }
 
-// Validación para score de crédito
 var creditScoreValidation validator.Func = func(fl validator.FieldLevel) bool {
 	value, ok := fl.Field().Interface().(int)
 	if ok {
@@ -88,7 +74,6 @@ var creditScoreValidation validator.Func = func(fl validator.FieldLevel) bool {
 	return false
 }
 
-// Validación para montos de préstamo
 var loanAmountValidation validator.Func = func(fl validator.FieldLevel) bool {
 	value, ok := fl.Field().Interface().(float64)
 	if ok {
@@ -97,26 +82,11 @@ var loanAmountValidation validator.Func = func(fl validator.FieldLevel) bool {
 	return false
 }
 
-// @title Loan API
-// @version 1.0
-// @description API REST para gestión de solicitudes de préstamos
-// @termsOfService http://swagger.io/terms/
+// SetupRouter configura el router de Gin específicamente para testing
+func SetupRouter(cfg config.Config) *gin.Engine {
+	// Configurar Gin en modo test
+	gin.SetMode(gin.TestMode)
 
-// @contact.name Soporte API
-// @contact.url http://www.swagger.io/support
-// @contact.email support@swagger.io
-
-// @license.name Apache 2.0
-// @license.url http://www.apache.org/licenses/LICENSE-2.0.html
-
-// @host localhost:8080
-// @BasePath /loan-api/api/v1
-
-// @securityDefinitions.apikey BearerAuth
-// @in header
-// @name Authorization
-// @description Type "Bearer" followed by a space and JWT token.
-func main() {
 	// Registrar validaciones personalizadas
 	if v, ok := binding.Validator.Engine().(*validator.Validate); ok {
 		v.RegisterValidation("alpha", alphaValidation)
@@ -125,14 +95,8 @@ func main() {
 		v.RegisterValidation("loan_amount", loanAmountValidation)
 	}
 
-	// Cargar configuración
-	config, err := config.LoadConfig(".")
-	if err != nil {
-		log.Fatal("No se pudieron cargar las variables de entorno", err)
-	}
-
-	// Conectar a la base de datos
-	database.Connect(&config)
+	// Conectar a la base de datos (usa la configuración pasada)
+	database.Connect(&cfg)
 
 	// Inicializar repositorios
 	userRepository := repositories.NewUserRepository(database.DB)
@@ -147,19 +111,24 @@ func main() {
 	loanService := services.NewLoanService(loanRepository, userRepository, loanTypeRepository)
 
 	// Inicializar controladores
-	userController := controllers.NewUserController(userService, &config)
+	userController := controllers.NewUserController(userService, &cfg)
 	tenantController := controllers.NewTenantController(tenantService)
 	loanTypeController := controllers.NewLoanTypeController(loanTypeService, tenantService)
 	loanController := controllers.NewLoanController(loanService, tenantService)
 
 	// Configurar servidor Gin
-	server = gin.New()
-	server.MaxMultipartMemory = 8 << 20 // 8 MiB
+	router := gin.New()
+	router.MaxMultipartMemory = 8 << 20 // 8 MiB
 
-	// Configurar logger personalizado
-	server.Use(gin.LoggerWithFormatter(func(param gin.LogFormatterParams) string {
-		if param.Path == "/loan-api/api/v1/health-checker" {
-			return ""
+	// Configurar logger personalizado para testing
+	router.Use(gin.LoggerWithFormatter(func(param gin.LogFormatterParams) string {
+		// En modo test, logging más simple
+		if cfg.AppEnv == "test" {
+			return fmt.Sprintf("[TEST] %s %s %d\n",
+				param.Method,
+				param.Path,
+				param.StatusCode,
+			)
 		}
 		return fmt.Sprintf("%s - [%s] \"%s %s %s %d %s \"%s\" %s\"\n",
 			param.ClientIP,
@@ -181,53 +150,44 @@ func main() {
 	corsConfig.AllowHeaders = []string{"Origin", "Content-Type", "Accept", "Authorization", "X-Tenant-ID"}
 	corsConfig.AllowCredentials = true
 
-	server.Use(cors.New(corsConfig))
+	router.Use(cors.New(corsConfig))
+
+	// Middleware de recuperación de errores
+	router.Use(gin.Recovery())
 
 	// Aplicar middleware Tenant de manera global
-	router := server.Group("/loan-api/api/v1")
 	router.Use(middlewares.Tenant())
 
-	// Configurar Swagger
-	if config.AppEnv == "local" || config.AppEnv == "dev" {
-		// Configurar Swagger en una ruta separada para evitar conflictos
-		server.GET("/docs/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
-	}
-
 	// Configurar rutas
+	apiGroup := router.Group("/loan-api/api/v1")
+
+	// Inicializar y configurar routers
 	userRouter := routers.NewUserRouter(userController)
+	loanRouter := routers.NewLoanRouter(loanController)
 	tenantRouter := routers.NewTenantRouter(tenantController)
 	loanTypeRouter := routers.NewLoanTypeRouter(loanTypeController)
-	loanRouter := routers.NewLoanRouter(loanController)
 
 	// Configurar rutas de los módulos
-	userRouter.Setup(router)
-	tenantRouter.Setup(router)
-	loanTypeRouter.Setup(router)
-	loanRouter.Setup(router)
+	userRouter.Setup(apiGroup)
+	loanRouter.Setup(apiGroup)
+	tenantRouter.Setup(apiGroup)
+	loanTypeRouter.Setup(apiGroup)
 
 	// Ruta de health check
-	router.GET("/health-checker", func(c *gin.Context) {
+	router.GET("/health", func(c *gin.Context) {
 		c.JSON(200, gin.H{
 			"status":  "success",
 			"message": "El servicio de préstamos está funcionando correctamente",
 		})
 	})
 
-	// Ruta raíz con información de la API
-	server.GET("/", func(c *gin.Context) {
+	// Ruta de health check en el grupo API
+	apiGroup.GET("/health-checker", func(c *gin.Context) {
 		c.JSON(200, gin.H{
-			"message":     "¡Bienvenido a Loan API!",
-			"version":     config.AppVersion,
-			"environment": config.AppEnv,
-			"docs":        "/docs/index.html",
-			"health":      "/loan-api/api/v1/health-checker",
+			"status":  "success",
+			"message": "El servicio de préstamos está funcionando correctamente",
 		})
 	})
 
-	// Iniciar servidor
-	log.Printf("🚀 Iniciando servidor en http://localhost:%s", config.ServerPort)
-	log.Printf("📚 Documentación disponible en: http://localhost:%s/docs/index.html", config.ServerPort)
-	log.Printf("💚 Health check: http://localhost:%s/loan-api/api/v1/health-checker", config.ServerPort)
-
-	log.Fatal(server.Run(":" + config.ServerPort))
+	return router
 }

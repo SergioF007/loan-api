@@ -14,10 +14,9 @@ type UserRepository interface {
 	Create(user *models.User) error
 	GetByID(id uint) (*models.User, error)
 	GetByEmail(email string) (*models.User, error)
-	Update(user *models.User) error
-	Delete(id uint) error
-	List(limit, offset int) ([]models.User, int64, error)
+	GetByDocument(documentType models.DocumentType, documentNumber string) (*models.User, error)
 	ExistsByEmail(email string) (bool, error)
+	ExistsByDocument(documentType models.DocumentType, documentNumber string) (bool, error)
 }
 
 // userRepository implementa UserRepository
@@ -68,46 +67,16 @@ func (r *userRepository) GetByEmail(email string) (*models.User, error) {
 	return &user, nil
 }
 
-// Update actualiza un usuario existente
-func (r *userRepository) Update(user *models.User) error {
-	if err := r.db.Save(user).Error; err != nil {
-		// Verificar si es un error de duplicado
-		if errors.Is(err, gorm.ErrDuplicatedKey) {
-			return app_error.ErrEmailExists
+// GetByDocument obtiene un usuario por su tipo y número de documento
+func (r *userRepository) GetByDocument(documentType models.DocumentType, documentNumber string) (*models.User, error) {
+	var user models.User
+	if err := r.db.Where("document_type = ? AND document_number = ?", documentType, documentNumber).First(&user).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, app_error.ErrUserNotFound
 		}
-		return app_error.NewDatabaseError("actualizar usuario", err.Error())
+		return nil, app_error.NewDatabaseError("obtener usuario por documento", err.Error())
 	}
-	return nil
-}
-
-// Delete elimina un usuario (soft delete)
-func (r *userRepository) Delete(id uint) error {
-	result := r.db.Delete(&models.User{}, id)
-	if result.Error != nil {
-		return app_error.NewDatabaseError("eliminar usuario", result.Error.Error())
-	}
-	if result.RowsAffected == 0 {
-		return app_error.ErrUserNotFound
-	}
-	return nil
-}
-
-// List obtiene una lista paginada de usuarios
-func (r *userRepository) List(limit, offset int) ([]models.User, int64, error) {
-	var users []models.User
-	var total int64
-
-	// Contar total de registros
-	if err := r.db.Model(&models.User{}).Count(&total).Error; err != nil {
-		return nil, 0, app_error.NewDatabaseError("contar usuarios", err.Error())
-	}
-
-	// Obtener usuarios paginados
-	if err := r.db.Limit(limit).Offset(offset).Find(&users).Error; err != nil {
-		return nil, 0, app_error.NewDatabaseError("listar usuarios", err.Error())
-	}
-
-	return users, total, nil
+	return &user, nil
 }
 
 // ExistsByEmail verifica si existe un usuario con el email dado
@@ -119,20 +88,11 @@ func (r *userRepository) ExistsByEmail(email string) (bool, error) {
 	return count > 0, nil
 }
 
-// GetUsersWithLoans obtiene usuarios con sus préstamos (método adicional)
-func (r *userRepository) GetUsersWithLoans(limit, offset int) ([]models.User, int64, error) {
-	var users []models.User
-	var total int64
-
-	// Contar total de registros
-	if err := r.db.Model(&models.User{}).Count(&total).Error; err != nil {
-		return nil, 0, app_error.NewDatabaseError("contar usuarios", err.Error())
+// ExistsByDocument verifica si existe un usuario con el documento dado
+func (r *userRepository) ExistsByDocument(documentType models.DocumentType, documentNumber string) (bool, error) {
+	var count int64
+	if err := r.db.Model(&models.User{}).Where("document_type = ? AND document_number = ?", documentType, documentNumber).Count(&count).Error; err != nil {
+		return false, app_error.NewDatabaseError("verificar documento", err.Error())
 	}
-
-	// Obtener usuarios con préstamos
-	if err := r.db.Preload("Loans").Limit(limit).Offset(offset).Find(&users).Error; err != nil {
-		return nil, 0, app_error.NewDatabaseError("listar usuarios con préstamos", err.Error())
-	}
-
-	return users, total, nil
+	return count > 0, nil
 }

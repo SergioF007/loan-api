@@ -3,6 +3,7 @@ package models
 import (
 	"time"
 
+	"github.com/shopspring/decimal"
 	"gorm.io/gorm"
 )
 
@@ -17,84 +18,112 @@ const (
 
 // Loan representa una solicitud de préstamo
 type Loan struct {
-	ID           uint           `json:"id" gorm:"primaryKey"`
-	UserID       uint           `json:"user_id" gorm:"not null" validate:"required"`
-	Amount       float64        `json:"amount" gorm:"type:decimal(15,2);not null" validate:"required,min=1"`
-	Purpose      string         `json:"purpose" gorm:"type:varchar(500);not null" validate:"required,min=10,max=500"`
-	Status       LoanStatus     `json:"status" gorm:"type:enum('pending','approved','rejected');default:'pending'" validate:"omitempty,oneof=pending approved rejected"`
-	RequestDate  time.Time      `json:"request_date" gorm:"not null"`
-	ApprovalDate *time.Time     `json:"approval_date,omitempty"`
-	CreatedAt    time.Time      `json:"created_at"`
-	UpdatedAt    time.Time      `json:"updated_at"`
-	DeletedAt    gorm.DeletedAt `json:"-" gorm:"index"`
-
-	// Relación con User (evitamos referencia circular con puntero)
-	User *User `json:"user,omitempty" gorm:"foreignKey:UserID"`
+	ID             uint            `json:"id" gorm:"primaryKey"`
+	LoanTypeID     uint            `json:"loan_type_id" gorm:"not null;index"`
+	LoanType       LoanType        `json:"loan_type"`
+	UserID         uint            `json:"user_id" gorm:"not null;index"`
+	User           User            `json:"user"`
+	Status         string          `json:"status" gorm:"size:50;default:'pending'"`
+	Observation    string          `json:"observation" gorm:"type:text"`
+	AmountApproved decimal.Decimal `json:"amount_approved" gorm:"type:decimal(13,2);default:0"`
+	Data           []LoanData      `json:"data"`
+	CreatedAt      time.Time       `json:"created_at" gorm:"autoCreateTime:true"`
+	UpdatedAt      time.Time       `json:"updated_at" gorm:"autoUpdateTime:true"`
+	DeletedAt      gorm.DeletedAt  `json:"-" gorm:"index"`
 }
 
-// LoanRequest representa la estructura para crear solicitudes de préstamo
-type LoanRequest struct {
-	UserID  uint    `json:"user_id" validate:"required"`
-	Amount  float64 `json:"amount" validate:"required,min=1"`
-	Purpose string  `json:"purpose" validate:"required,min=10,max=500"`
+// LoanData representa los datos dinámicos de una solicitud de préstamo
+type LoanData struct {
+	ID        uint           `json:"id" gorm:"primaryKey"`
+	LoanID    uint           `json:"loan_id" gorm:"not null;index"`
+	Loan      Loan           `json:"-"`
+	FormID    uint           `json:"form_id" gorm:"not null;index"`
+	Form      LoanTypeForm   `json:"-"`
+	Key       string         `json:"key" gorm:"size:255;not null"`
+	Value     string         `json:"value" gorm:"type:text"`
+	Index     uint           `json:"index" gorm:"default:0"`
+	CreatedAt time.Time      `json:"-" gorm:"autoCreateTime:true"`
+	UpdatedAt time.Time      `json:"-" gorm:"autoUpdateTime:true"`
+	DeletedAt gorm.DeletedAt `json:"-" gorm:"index"`
 }
 
-// LoanStatusUpdateRequest representa la estructura para actualizar el estado
-type LoanStatusUpdateRequest struct {
-	Status LoanStatus `json:"status" validate:"required,oneof=pending approved rejected"`
+// Requests para la nueva estructura
+// CreateLoanRequest representa la estructura para crear solicitudes de préstamo
+type CreateLoanRequest struct {
+	LoanTypeID uint `json:"loan_type_id" validate:"required"`
 }
 
+// SaveLoanDataRequest representa la estructura para guardar datos de préstamo
+type SaveLoanDataRequest struct {
+	LoanID uint                  `json:"loan_id" validate:"required"`
+	Data   []LoanDataItemRequest `json:"data" validate:"required,dive"`
+}
+
+// LoanDataItemRequest representa un item de datos de préstamo
+type LoanDataItemRequest struct {
+	FormID uint   `json:"form_id" validate:"required"`
+	Key    string `json:"key" validate:"required"`
+	Value  string `json:"value" validate:"required"`
+	Index  uint   `json:"index"`
+}
+
+// Responses para la nueva estructura
 // LoanResponse representa la respuesta de préstamo
 type LoanResponse struct {
-	ID           uint       `json:"id"`
-	UserID       uint       `json:"user_id"`
-	Amount       float64    `json:"amount"`
-	Purpose      string     `json:"purpose"`
-	Status       LoanStatus `json:"status"`
-	RequestDate  time.Time  `json:"request_date"`
-	ApprovalDate *time.Time `json:"approval_date,omitempty"`
-	CreatedAt    time.Time  `json:"created_at"`
-	UpdatedAt    time.Time  `json:"updated_at"`
-	User         *User      `json:"user,omitempty"`
+	ID             uint               `json:"id"`
+	LoanTypeID     uint               `json:"loan_type_id"`
+	LoanType       LoanTypeResponse   `json:"loan_type"`
+	UserID         uint               `json:"user_id"`
+	User           UserResponse       `json:"user"`
+	Status         string             `json:"status"`
+	Observation    string             `json:"observation"`
+	AmountApproved decimal.Decimal    `json:"amount_approved"`
+	Data           []LoanDataResponse `json:"data"`
+	CreatedAt      time.Time          `json:"created_at"`
+	UpdatedAt      time.Time          `json:"updated_at"`
+}
+
+// LoanDataResponse representa la respuesta de datos de préstamo
+type LoanDataResponse struct {
+	ID     uint   `json:"id"`
+	FormID uint   `json:"form_id"`
+	Key    string `json:"key"`
+	Value  string `json:"value"`
+	Index  uint   `json:"index"`
 }
 
 // ToResponse convierte un Loan a LoanResponse
 func (l *Loan) ToResponse() LoanResponse {
+	dataResponse := make([]LoanDataResponse, len(l.Data))
+	for i, data := range l.Data {
+		dataResponse[i] = LoanDataResponse{
+			ID:     data.ID,
+			FormID: data.FormID,
+			Key:    data.Key,
+			Value:  data.Value,
+			Index:  data.Index,
+		}
+	}
+
 	return LoanResponse{
-		ID:           l.ID,
-		UserID:       l.UserID,
-		Amount:       l.Amount,
-		Purpose:      l.Purpose,
-		Status:       l.Status,
-		RequestDate:  l.RequestDate,
-		ApprovalDate: l.ApprovalDate,
-		CreatedAt:    l.CreatedAt,
-		UpdatedAt:    l.UpdatedAt,
-		User:         l.User,
+		ID:             l.ID,
+		LoanTypeID:     l.LoanTypeID,
+		UserID:         l.UserID,
+		Status:         l.Status,
+		Observation:    l.Observation,
+		AmountApproved: l.AmountApproved,
+		Data:           dataResponse,
+		CreatedAt:      l.CreatedAt,
+		UpdatedAt:      l.UpdatedAt,
 	}
-}
-
-// IsValidStatus verifica si el estado es válido
-func (l *Loan) IsValidStatus(status LoanStatus) bool {
-	return status == LoanStatusPending || status == LoanStatusApproved || status == LoanStatusRejected
-}
-
-// CanUpdateStatus verifica si se puede actualizar el estado
-func (l *Loan) CanUpdateStatus(newStatus LoanStatus) bool {
-	// No se puede cambiar el estado de préstamos ya aprobados o rechazados
-	if l.Status == LoanStatusApproved || l.Status == LoanStatusRejected {
-		return false
-	}
-
-	// Solo se puede cambiar de pending a approved/rejected
-	if l.Status == LoanStatusPending && (newStatus == LoanStatusApproved || newStatus == LoanStatusRejected) {
-		return true
-	}
-
-	return false
 }
 
 // TableName especifica el nombre de la tabla para GORM
 func (Loan) TableName() string {
 	return "loans"
+}
+
+// TableName especifica el nombre de la tabla para GORM
+func (LoanData) TableName() string {
+	return "loan_data"
 }
