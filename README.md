@@ -34,7 +34,7 @@ loan-api/
 ```
 
 ### Tecnologías Utilizadas
-- **Go 1.21+** - Lenguaje de programación
+- **Go 1.23+** - Lenguaje de programación
 - **Gin** - Framework web
 - **GORM** - ORM para base de datos
 - **MySQL** - Base de datos
@@ -45,7 +45,7 @@ loan-api/
 ## 🚀 Instalación y Configuración
 
 ### Prerrequisitos
-- Go 1.21 o superior
+- Go 1.23 o superior
 - MySQL 8.0 o superior
 - Git
 
