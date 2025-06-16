@@ -54,7 +54,6 @@ func (r *loanTypeRepository) GetByIDWithForms(id uint) (*models.LoanType, error)
 		Preload("Versions", "is_active = ? AND is_default = ?", true, true).
 		Preload("Versions.Forms", "is_active = ?", true).
 		Preload("Versions.Forms.FormInputs", "is_active = ?", true).
-		Preload("Versions.FormInputs", "is_active = ?", true).
 		First(&loanType).Error
 	if err != nil {
 		return nil, err

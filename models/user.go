@@ -26,7 +26,6 @@ type User struct {
 	DocumentNumber string         `json:"document_number" gorm:"type:varchar(20);uniqueIndex;not null" validate:"required,min=5,max=20"`
 	Password       string         `json:"-" gorm:"type:varchar(255);not null" validate:"required,min=8"`
 	Income         *float64       `json:"income" gorm:"type:decimal(15,2);default:0"`
-	CreditScore    *int           `json:"credit_score" gorm:"type:int;default:0"`
 	IP             string         `json:"ip,omitempty" gorm:"type:varchar(45)"`
 	CreatedAt      time.Time      `json:"created_at" gorm:"autoCreateTime:true"`
 	UpdatedAt      time.Time      `json:"updated_at" gorm:"autoUpdateTime:true"`

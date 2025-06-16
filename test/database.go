@@ -11,7 +11,31 @@ import (
 	"loan-api/models"
 )
 
-// ClearDatabase limpia todas las tablas y resetea los AUTO_INCREMENT
+// ClearTestData limpia solo los datos de prueba, preservando datos del seed
+func ClearTestData(DB *gorm.DB) {
+	if DB == nil {
+		log.Println("Warning: Database connection is nil")
+		return
+	}
+
+	DB.Exec("SET foreign_key_checks = 0")
+
+	// Limpiar solo datos de prueba (no tocar los datos del seed)
+	DB.Exec("DELETE FROM loan_data")
+	DB.Exec("ALTER TABLE loan_data AUTO_INCREMENT = 1")
+
+	DB.Exec("DELETE FROM loans")
+	DB.Exec("ALTER TABLE loans AUTO_INCREMENT = 1")
+
+	DB.Exec("DELETE FROM users")
+	DB.Exec("ALTER TABLE users AUTO_INCREMENT = 1")
+
+	DB.Exec("SET foreign_key_checks = 1")
+
+	log.Println("Test data cleared successfully")
+}
+
+// ClearDatabase limpia todas las tablas y resetea los AUTO_INCREMENT (para cleanup final)
 func ClearDatabase(DB *gorm.DB) {
 	if DB == nil {
 		log.Println("Warning: Database connection is nil")
@@ -20,13 +44,30 @@ func ClearDatabase(DB *gorm.DB) {
 
 	DB.Exec("SET foreign_key_checks = 0")
 
-	// Limpiar préstamos primero (tiene FK a users)
+	// Limpiar TODAS las tablas (incluyendo datos del seed)
+	DB.Exec("DELETE FROM loan_data")
+	DB.Exec("ALTER TABLE loan_data AUTO_INCREMENT = 1")
+
 	DB.Exec("DELETE FROM loans")
 	DB.Exec("ALTER TABLE loans AUTO_INCREMENT = 1")
 
-	// Limpiar usuarios
 	DB.Exec("DELETE FROM users")
 	DB.Exec("ALTER TABLE users AUTO_INCREMENT = 1")
+
+	DB.Exec("DELETE FROM loan_type_version_form_inputs")
+	DB.Exec("ALTER TABLE loan_type_version_form_inputs AUTO_INCREMENT = 1")
+
+	DB.Exec("DELETE FROM loan_type_forms")
+	DB.Exec("ALTER TABLE loan_type_forms AUTO_INCREMENT = 1")
+
+	DB.Exec("DELETE FROM loan_type_versions")
+	DB.Exec("ALTER TABLE loan_type_versions AUTO_INCREMENT = 1")
+
+	DB.Exec("DELETE FROM loan_types")
+	DB.Exec("ALTER TABLE loan_types AUTO_INCREMENT = 1")
+
+	DB.Exec("DELETE FROM tenants")
+	DB.Exec("ALTER TABLE tenants AUTO_INCREMENT = 1")
 
 	DB.Exec("SET foreign_key_checks = 1")
 
@@ -41,10 +82,11 @@ func LoadUsers(DB *gorm.DB) {
 	}
 
 	// Hash de contraseña de prueba
-	hashedPassword, _ := bcrypt.GenerateFromPassword([]byte("password123"), bcrypt.DefaultCost)
+	hashedPassword, _ := bcrypt.GenerateFromPassword([]byte("password123!"), bcrypt.DefaultCost)
 
 	users := []models.User{
 		{
+			TenantID:       1, // Usar el tenant creado
 			Name:           "Juan Pérez",
 			Email:          "juan@example.com",
 			Phone:          "3001234567",
@@ -56,6 +98,7 @@ func LoadUsers(DB *gorm.DB) {
 			UpdatedAt:      time.Now(),
 		},
 		{
+			TenantID:       1, // Usar el tenant creado
 			Name:           "María García",
 			Email:          "maria@example.com",
 			Phone:          "3009876543",
@@ -67,6 +110,7 @@ func LoadUsers(DB *gorm.DB) {
 			UpdatedAt:      time.Now(),
 		},
 		{
+			TenantID:       1, // Usar el tenant creado
 			Name:           "Carlos López",
 			Email:          "carlos@example.com",
 			Phone:          "3012345678",
@@ -78,6 +122,7 @@ func LoadUsers(DB *gorm.DB) {
 			UpdatedAt:      time.Now(),
 		},
 		{
+			TenantID:       1, // Usar el tenant creado
 			Name:           "Ana Rodríguez",
 			Email:          "ana@example.com",
 			Phone:          "3098765432",
@@ -89,6 +134,7 @@ func LoadUsers(DB *gorm.DB) {
 			UpdatedAt:      time.Now(),
 		},
 		{
+			TenantID:       1, // Usar el tenant creado
 			Name:           "Diego Martínez",
 			Email:          "diego@example.com",
 			Phone:          "3011111111",
@@ -119,31 +165,37 @@ func LoadLoans(DB *gorm.DB) {
 
 	loans := []models.Loan{
 		{
+			LoanTypeID:     1, // Usar el loan type creado
 			UserID:         1,
 			AmountApproved: decimal.NewFromFloat(10000000),
 			Status:         "pending",
 		},
 		{
+			LoanTypeID:     1, // Usar el loan type creado
 			UserID:         2,
 			AmountApproved: decimal.NewFromFloat(5000000),
 			Status:         "approved",
 		},
 		{
+			LoanTypeID:     1, // Usar el loan type creado
 			UserID:         3,
 			AmountApproved: decimal.NewFromFloat(15000000),
 			Status:         "rejected",
 		},
 		{
+			LoanTypeID:     1, // Usar el loan type creado
 			UserID:         4,
 			AmountApproved: decimal.NewFromFloat(8000000),
 			Status:         "approved",
 		},
 		{
+			LoanTypeID:     1, // Usar el loan type creado
 			UserID:         5,
 			AmountApproved: decimal.NewFromFloat(3000000),
 			Status:         "pending",
 		},
 		{
+			LoanTypeID:     1, // Usar el loan type creado
 			UserID:         1,
 			AmountApproved: decimal.NewFromFloat(12000000),
 			Status:         "pending",
@@ -169,11 +221,11 @@ func LoadTestData(DB *gorm.DB) {
 	log.Println("Loading test data...")
 
 	// Limpiar base de datos primero
-	ClearDatabase(DB)
+	ClearTestData(DB)
 
-	// Cargar datos en orden correcto (usuarios primero, luego préstamos)
-	LoadUsers(DB)
-	LoadLoans(DB)
+	// Cargar solo usuarios y préstamos (tenants y loan types ya están por seedInitialData)
+	LoadUsers(DB) // Usuarios (usan tenant_id=1 del seed)
+	LoadLoans(DB) // Préstamos (usan loan_type_id=1 del seed)
 
 	log.Println("Test data loaded successfully")
 }

@@ -2,6 +2,7 @@ package controllers_test
 
 import (
 	"encoding/json"
+	"log"
 	"os"
 	"testing"
 
@@ -20,7 +21,10 @@ var (
 )
 
 func TestMain(m *testing.M) {
-	cfg, _ := config.LoadConfig("../")
+	cfg, err := config.LoadConfig("../")
+	if err != nil {
+		log.Fatalf("Error loading config: %v", err)
+	}
 
 	CONFIG = cfg
 	database.Connect(&cfg)
@@ -35,6 +39,11 @@ func TestMain(m *testing.M) {
 
 func TestUserController_RegisterUser(t *testing.T) {
 	c := require.New(t)
+
+	// Headers válidos
+	headers := map[string]string{
+		"X-Tenant-ID": "1",
+	}
 
 	t.Run("Debería registrar usuario exitosamente con datos válidos", func(t *testing.T) {
 
@@ -64,7 +73,7 @@ func TestUserController_RegisterUser(t *testing.T) {
 		}
 
 		// Realizar la petición POST
-		w := test.MakePostRequest(CONFIG, "/loan-api/api/v1/auth/register", requestBody, nil)
+		w := test.MakePostRequest(CONFIG, "/loan-api/api/v1/auth/register", requestBody, headers)
 
 		// Verificar código de respuesta exitoso
 		c.Equal(201, w.Code)
@@ -113,7 +122,7 @@ func TestUserController_RegisterUser(t *testing.T) {
 		}
 
 		// Realizar la petición POST
-		w := test.MakePostRequest(CONFIG, "/loan-api/api/v1/auth/register", requestBody, nil)
+		w := test.MakePostRequest(CONFIG, "/loan-api/api/v1/auth/register", requestBody, headers)
 
 		// Verificar código de respuesta de error
 		c.Equal(409, w.Code)
@@ -143,7 +152,7 @@ func TestUserController_RegisterUser(t *testing.T) {
 		}
 
 		// Realizar la petición POST
-		w := test.MakePostRequest(CONFIG, "/loan-api/api/v1/auth/register", requestBody, nil)
+		w := test.MakePostRequest(CONFIG, "/loan-api/api/v1/auth/register", requestBody, headers)
 
 		// Verificar código de respuesta de error
 		c.Equal(400, w.Code)
@@ -173,7 +182,7 @@ func TestUserController_RegisterUser(t *testing.T) {
 		}
 
 		// Realizar la petición POST
-		w := test.MakePostRequest(CONFIG, "/loan-api/api/v1/auth/register", requestBody, nil)
+		w := test.MakePostRequest(CONFIG, "/loan-api/api/v1/auth/register", requestBody, headers)
 
 		// Verificar código de respuesta de error
 		c.Equal(400, w.Code)
@@ -195,7 +204,7 @@ func TestUserController_RegisterUser(t *testing.T) {
 		invalidJSON := "invalid_json_string"
 
 		// Realizar la petición POST con JSON inválido
-		w := test.MakePostRequest(CONFIG, "/loan-api/api/v1/auth/register", invalidJSON, nil)
+		w := test.MakePostRequest(CONFIG, "/loan-api/api/v1/auth/register", invalidJSON, headers)
 
 		// Verificar código de respuesta de error
 		c.Equal(400, w.Code)
@@ -216,6 +225,11 @@ func TestUserController_RegisterUser(t *testing.T) {
 func TestUserController_Login(t *testing.T) {
 	c := require.New(t)
 
+	// Headers válidos
+	headers := map[string]string{
+		"X-Tenant-ID": "1",
+	}
+
 	t.Run("Debería hacer login exitosamente con credenciales válidas", func(t *testing.T) {
 		// Cargar datos de prueba
 		test.LoadTestData(DB)
@@ -223,11 +237,11 @@ func TestUserController_Login(t *testing.T) {
 		// Datos de login
 		requestBody := map[string]interface{}{
 			"email":    "juan@example.com",
-			"password": "password123", // Contraseña de los datos de prueba
+			"password": "password123!", // Contraseña de los datos de prueba
 		}
 
 		// Realizar la petición POST
-		w := test.MakePostRequest(CONFIG, "/loan-api/api/v1/auth/login", requestBody, nil)
+		w := test.MakePostRequest(CONFIG, "/loan-api/api/v1/auth/login", requestBody, headers)
 
 		// Verificar código de respuesta exitoso
 		c.Equal(200, w.Code)
@@ -259,7 +273,7 @@ func TestUserController_Login(t *testing.T) {
 		}
 
 		// Realizar la petición POST
-		w := test.MakePostRequest(CONFIG, "/loan-api/api/v1/auth/login", requestBody, nil)
+		w := test.MakePostRequest(CONFIG, "/loan-api/api/v1/auth/login", requestBody, headers)
 
 		// Verificar código de respuesta de error
 		c.Equal(400, w.Code)
@@ -273,7 +287,7 @@ func TestUserController_Login(t *testing.T) {
 
 		// Acceder al mensaje dentro del campo error
 		errorData := response["error"].(map[string]interface{})
-		c.Contains(errorData["message"], "Email o contraseña incorrectos")
+		c.Contains(errorData["details"], "Email o contraseña incorrectos")
 	})
 
 	t.Run("Debería fallar con usuario inexistente", func(t *testing.T) {
@@ -283,11 +297,11 @@ func TestUserController_Login(t *testing.T) {
 		// Datos de login con email inexistente
 		requestBody := map[string]interface{}{
 			"email":    "noexiste@example.com",
-			"password": "password123",
+			"password": "password123!",
 		}
 
 		// Realizar la petición POST
-		w := test.MakePostRequest(CONFIG, "/loan-api/api/v1/auth/login", requestBody, nil)
+		w := test.MakePostRequest(CONFIG, "/loan-api/api/v1/auth/login", requestBody, headers)
 
 		// Verificar código de respuesta de error
 		c.Equal(400, w.Code)

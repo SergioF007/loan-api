@@ -41,7 +41,7 @@ func (s *userService) RegisterUser(req *models.RegisterRequest, tenantID uint) (
 	}
 
 	// Verificar si el email ya existe
-	exists, err := s.userRepo.ExistsByEmail(req.Email)
+	exists, err := s.userRepo.ExistsByEmail(req.Email, tenantID)
 	if err != nil {
 		return nil, err
 	}

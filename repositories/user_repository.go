@@ -15,7 +15,7 @@ type UserRepository interface {
 	GetByID(id uint) (*models.User, error)
 	GetByEmail(email string) (*models.User, error)
 	GetByDocument(documentType models.DocumentType, documentNumber string) (*models.User, error)
-	ExistsByEmail(email string) (bool, error)
+	ExistsByEmail(email string, tenantID uint) (bool, error)
 	ExistsByDocument(documentType models.DocumentType, documentNumber string) (bool, error)
 }
 
@@ -80,9 +80,9 @@ func (r *userRepository) GetByDocument(documentType models.DocumentType, documen
 }
 
 // ExistsByEmail verifica si existe un usuario con el email dado
-func (r *userRepository) ExistsByEmail(email string) (bool, error) {
+func (r *userRepository) ExistsByEmail(email string, tenantID uint) (bool, error) {
 	var count int64
-	if err := r.db.Model(&models.User{}).Where("email = ?", email).Count(&count).Error; err != nil {
+	if err := r.db.Model(&models.User{}).Where("email = ? AND tenant_id = ?", email, tenantID).Count(&count).Error; err != nil {
 		return false, app_error.NewDatabaseError("verificar email", err.Error())
 	}
 	return count > 0, nil

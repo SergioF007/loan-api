@@ -27,9 +27,10 @@ func (r *LoanRouter) Setup(router *gin.RouterGroup) {
 		// Todas las rutas de préstamos requieren autenticación
 		loans.Use(middlewares.AuthMiddleware())
 
-		loans.POST("", r.loanController.CreateLoan)        // POST /api/v1/loans - Crear préstamo
-		loans.POST("/data", r.loanController.SaveLoanData) // POST /api/v1/loans/data - Guardar datos del préstamo
-		loans.GET("/:id", r.loanController.GetLoan)        // GET /api/v1/loans/{id} - Obtener préstamo por ID
-		loans.GET("/user", r.loanController.GetUserLoans)  // GET /api/v1/loans/user - Obtener préstamos del usuario
+		loans.POST("", r.loanController.CreateLoan)                       // POST /api/v1/loans - Crear préstamo
+		loans.POST("/data", r.loanController.SaveLoanData)                // POST /api/v1/loans/data - Guardar datos del préstamo
+		loans.POST("/:id/decision", r.loanController.ProcessLoanDecision) // POST /api/v1/loans/{id}/decision - Procesar decisión final
+		loans.GET("/:id", r.loanController.GetLoan)                       // GET /api/v1/loans/{id} - Obtener préstamo por ID
+		loans.GET("/user", r.loanController.GetUserLoans)                 // GET /api/v1/loans/user - Obtener préstamos del usuario
 	}
 }

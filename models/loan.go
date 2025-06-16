@@ -11,9 +11,11 @@ import (
 type LoanStatus string
 
 const (
-	LoanStatusPending  LoanStatus = "pending"
-	LoanStatusApproved LoanStatus = "approved"
-	LoanStatusRejected LoanStatus = "rejected"
+	LoanStatusPending    LoanStatus = "pending"     // Préstamo creado, sin datos
+	LoanStatusOnProgress LoanStatus = "on_progress" // Datos parciales guardados
+	LoanStatusCompleted  LoanStatus = "completed"   // Datos completados + validaciones realizadas
+	LoanStatusApproved   LoanStatus = "approved"    // Préstamo aprobado
+	LoanStatusRejected   LoanStatus = "rejected"    // Préstamo rechazado
 )
 
 // Loan representa una solicitud de préstamo
@@ -26,10 +28,13 @@ type Loan struct {
 	Status         string          `json:"status" gorm:"size:50;default:'pending'"`
 	Observation    string          `json:"observation" gorm:"type:text"`
 	AmountApproved decimal.Decimal `json:"amount_approved" gorm:"type:decimal(13,2);default:0"`
-	Data           []LoanData      `json:"data"`
-	CreatedAt      time.Time       `json:"created_at" gorm:"autoCreateTime:true"`
-	UpdatedAt      time.Time       `json:"updated_at" gorm:"autoUpdateTime:true"`
-	DeletedAt      gorm.DeletedAt  `json:"-" gorm:"index"`
+	// Campos para resultados de validaciones
+	CreditScore      *int           `json:"credit_score,omitempty" gorm:"type:int;default:0"`
+	IdentityVerified *bool          `json:"identity_verified,omitempty" gorm:"default:false"`
+	Data             []LoanData     `json:"data"`
+	CreatedAt        time.Time      `json:"created_at" gorm:"autoCreateTime:true"`
+	UpdatedAt        time.Time      `json:"updated_at" gorm:"autoUpdateTime:true"`
+	DeletedAt        gorm.DeletedAt `json:"-" gorm:"index"`
 }
 
 // LoanData representa los datos dinámicos de una solicitud de préstamo
@@ -70,17 +75,19 @@ type LoanDataItemRequest struct {
 // Responses para la nueva estructura
 // LoanResponse representa la respuesta de préstamo
 type LoanResponse struct {
-	ID             uint               `json:"id"`
-	LoanTypeID     uint               `json:"loan_type_id"`
-	LoanType       LoanTypeResponse   `json:"loan_type"`
-	UserID         uint               `json:"user_id"`
-	User           UserResponse       `json:"user"`
-	Status         string             `json:"status"`
-	Observation    string             `json:"observation"`
-	AmountApproved decimal.Decimal    `json:"amount_approved"`
-	Data           []LoanDataResponse `json:"data"`
-	CreatedAt      time.Time          `json:"created_at"`
-	UpdatedAt      time.Time          `json:"updated_at"`
+	ID               uint               `json:"id"`
+	LoanTypeID       uint               `json:"loan_type_id"`
+	LoanType         LoanTypeResponse   `json:"loan_type"`
+	UserID           uint               `json:"user_id"`
+	User             UserResponse       `json:"user"`
+	Status           string             `json:"status"`
+	Observation      string             `json:"observation"`
+	AmountApproved   decimal.Decimal    `json:"amount_approved"`
+	CreditScore      *int               `json:"credit_score,omitempty"`
+	IdentityVerified *bool              `json:"identity_verified,omitempty"`
+	Data             []LoanDataResponse `json:"data"`
+	CreatedAt        time.Time          `json:"created_at"`
+	UpdatedAt        time.Time          `json:"updated_at"`
 }
 
 // LoanDataResponse representa la respuesta de datos de préstamo
@@ -106,15 +113,17 @@ func (l *Loan) ToResponse() LoanResponse {
 	}
 
 	return LoanResponse{
-		ID:             l.ID,
-		LoanTypeID:     l.LoanTypeID,
-		UserID:         l.UserID,
-		Status:         l.Status,
-		Observation:    l.Observation,
-		AmountApproved: l.AmountApproved,
-		Data:           dataResponse,
-		CreatedAt:      l.CreatedAt,
-		UpdatedAt:      l.UpdatedAt,
+		ID:               l.ID,
+		LoanTypeID:       l.LoanTypeID,
+		UserID:           l.UserID,
+		Status:           l.Status,
+		Observation:      l.Observation,
+		AmountApproved:   l.AmountApproved,
+		CreditScore:      l.CreditScore,
+		IdentityVerified: l.IdentityVerified,
+		Data:             dataResponse,
+		CreatedAt:        l.CreatedAt,
+		UpdatedAt:        l.UpdatedAt,
 	}
 }
 

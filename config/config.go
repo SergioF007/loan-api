@@ -1,6 +1,7 @@
 package config
 
 import (
+	"fmt"
 	"log"
 	"time"
 
@@ -21,10 +22,10 @@ type Config struct {
 	ServerPort string `mapstructure:"SERVER_PORT"`
 
 	// Token Configuration (RSA)
-	AccessTokenPrivateKey string `mapstructure:"ACCESS_TOKEN_PRIVATE_KEY"`
-	AccessTokenPublicKey  string `mapstructure:"ACCESS_TOKEN_PUBLIC_KEY"`
-	AccessTokenExpiresIn  string `mapstructure:"ACCESS_TOKEN_EXPIRED_IN"`
-	AccessTokenMaxAge     int    `mapstructure:"ACCESS_TOKEN_MAXAGE"`
+	AccessTokenPrivateKey string        `mapstructure:"ACCESS_TOKEN_PRIVATE_KEY"`
+	AccessTokenPublicKey  string        `mapstructure:"ACCESS_TOKEN_PUBLIC_KEY"`
+	AccessTokenExpiresIn  time.Duration `mapstructure:"ACCESS_TOKEN_EXPIRED_IN"`
+	AccessTokenMaxAge     int           `mapstructure:"ACCESS_TOKEN_MAXAGE"`
 
 	// Aplicación
 	AppEnv     string `mapstructure:"APP_ENV"`
@@ -45,8 +46,10 @@ func LoadConfig(path string) (config Config, err error) {
 	// Leer el archivo de configuración
 	err = viper.ReadInConfig()
 	if err != nil {
-		log.Printf("Warning: No se pudo leer el archivo de configuración: %v", err)
+		log.Printf("Warning: No se pudo leer el archivo de configuración desde %s: %v", path, err)
 		log.Println("Usando solo variables de entorno...")
+	} else {
+		log.Printf("Configuración cargada desde: %s", viper.ConfigFileUsed())
 	}
 
 	// Mapear las variables a la estructura Config
@@ -66,14 +69,19 @@ func LoadConfig(path string) (config Config, err error) {
 		config.ServerPort = "8080"
 	}
 	if config.AccessTokenPrivateKey == "" {
-		log.Fatal("ACCESS_TOKEN_PRIVATE_KEY es requerido")
+		return config, fmt.Errorf("ACCESS_TOKEN_PRIVATE_KEY es requerido")
 	}
-	if config.AccessTokenExpiresIn == "" {
-		config.AccessTokenExpiresIn = "600m"
+	if config.AccessTokenPublicKey == "" {
+		return config, fmt.Errorf("ACCESS_TOKEN_PUBLIC_KEY es requerido")
+	}
+	if config.AccessTokenExpiresIn == 0 {
+		config.AccessTokenExpiresIn = 600 * time.Minute
 	}
 	if config.AccessTokenMaxAge == 0 {
 		config.AccessTokenMaxAge = 43800
 	}
+
+	log.Printf("Configuración cargada: DB=%s:%s/%s, AppEnv=%s", config.DBHost, config.DBPort, config.DBName, config.AppEnv)
 
 	return config, nil
 }
@@ -116,9 +124,4 @@ func (c *Config) GetEnvironment() string {
 // UseRSATokens verifica si debe usar tokens RSA
 func (c *Config) UseRSATokens() bool {
 	return c.AccessTokenPrivateKey != "" && c.AccessTokenPublicKey != ""
-}
-
-// GetTokenExpirationDuration retorna la duración de expiración del token
-func (c *Config) GetTokenExpirationDuration() (time.Duration, error) {
-	return time.ParseDuration(c.AccessTokenExpiresIn)
 }

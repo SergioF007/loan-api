@@ -98,6 +98,9 @@ func SetupRouter(cfg config.Config) *gin.Engine {
 	// Conectar a la base de datos (usa la configuración pasada)
 	database.Connect(&cfg)
 
+	// Ejecutar migraciones para tests
+	database.Migrate()
+
 	// Inicializar repositorios
 	userRepository := repositories.NewUserRepository(database.DB)
 	loanRepository := repositories.NewLoanRepository(database.DB)

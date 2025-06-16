@@ -42,31 +42,17 @@ func NewLoanController(loanService services.LoanService, tenantService services.
 func (ctrl *LoanController) CreateLoan(c *gin.Context) {
 	log.Println("LoanController::CreateLoan was invoked")
 
-	// Validar header X-Tenant-ID
-	tenantIDStr := c.GetHeader("X-Tenant-ID")
-	if tenantIDStr == "" {
-		utils.BadRequestResponse(c, "Header X-Tenant-ID es requerido")
-		return
-	}
-
-	tenantID, err := strconv.ParseUint(tenantIDStr, 10, 32)
-	if err != nil {
-		utils.BadRequestResponse(c, "X-Tenant-ID debe ser un número válido")
-		return
-	}
-
-	// Validar que el tenant existe
-	_, err = ctrl.tenantService.ValidateTenantID(uint(tenantID))
-	if err != nil {
-		utils.NotFoundResponse(c, "Tenant no encontrado")
-		return
-	}
-
 	var req models.CreateLoanRequest
 
 	// Parsear JSON del request
 	if err := c.ShouldBindJSON(&req); err != nil {
 		utils.BadRequestResponse(c, "Formato JSON inválido")
+		return
+	}
+
+	// Validar campos requeridos
+	if req.LoanTypeID == 0 {
+		utils.BadRequestResponse(c, "loan_type_id es requerido")
 		return
 	}
 
@@ -106,31 +92,24 @@ func (ctrl *LoanController) CreateLoan(c *gin.Context) {
 func (ctrl *LoanController) SaveLoanData(c *gin.Context) {
 	log.Println("LoanController::SaveLoanData was invoked")
 
-	// Validar header X-Tenant-ID
-	tenantIDStr := c.GetHeader("X-Tenant-ID")
-	if tenantIDStr == "" {
-		utils.BadRequestResponse(c, "Header X-Tenant-ID es requerido")
-		return
-	}
-
-	tenantID, err := strconv.ParseUint(tenantIDStr, 10, 32)
-	if err != nil {
-		utils.BadRequestResponse(c, "X-Tenant-ID debe ser un número válido")
-		return
-	}
-
-	// Validar que el tenant existe
-	_, err = ctrl.tenantService.ValidateTenantID(uint(tenantID))
-	if err != nil {
-		utils.NotFoundResponse(c, "Tenant no encontrado")
-		return
-	}
+	// El tenant ya fue validado por el middleware
 
 	var req models.SaveLoanDataRequest
 
 	// Parsear JSON del request
 	if err := c.ShouldBindJSON(&req); err != nil {
 		utils.BadRequestResponse(c, "Formato JSON inválido")
+		return
+	}
+
+	// Validar campos requeridos
+	if req.LoanID == 0 {
+		utils.BadRequestResponse(c, "loan_id es requerido")
+		return
+	}
+
+	if len(req.Data) == 0 {
+		utils.BadRequestResponse(c, "data es requerido")
 		return
 	}
 
@@ -220,16 +199,8 @@ func (ctrl *LoanController) GetUserLoans(c *gin.Context) {
 
 	// Validar header X-Tenant-ID
 	tenantIDStr := c.GetHeader("X-Tenant-ID")
-	if tenantIDStr == "" {
-		utils.BadRequestResponse(c, "Header X-Tenant-ID es requerido")
-		return
-	}
 
 	tenantID, err := strconv.ParseUint(tenantIDStr, 10, 32)
-	if err != nil {
-		utils.BadRequestResponse(c, "X-Tenant-ID debe ser un número válido")
-		return
-	}
 
 	// Validar que el tenant existe
 	_, err = ctrl.tenantService.ValidateTenantID(uint(tenantID))
@@ -254,4 +225,41 @@ func (ctrl *LoanController) GetUserLoans(c *gin.Context) {
 
 	// Retornar respuesta exitosa
 	utils.SuccessResponse(c, 200, "Préstamos obtenidos exitosamente", loansResponse)
+}
+
+// ProcessLoanDecision godoc
+// @Summary Procesar decisión final del préstamo
+// @Description Evalúa el score crediticio y verificación de identidad para aprobar/rechazar y realizar desembolso
+// @Tags loans
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param X-Tenant-ID header string true "ID del tenant"
+// @Param id path int true "ID del préstamo"
+// @Success 200 {object} utils.APIResponse{data=models.LoanResponse}
+// @Failure 400 {object} utils.APIResponse
+// @Failure 401 {object} utils.APIResponse
+// @Failure 404 {object} utils.APIResponse
+// @Failure 500 {object} utils.APIResponse
+// @Router /loans/{id}/decision [post]
+func (ctrl *LoanController) ProcessLoanDecision(c *gin.Context) {
+	log.Println("LoanController::ProcessLoanDecision was invoked")
+
+	// Obtener ID del préstamo desde los parámetros
+	loanIDStr := c.Param("id")
+	loanID, err := strconv.ParseUint(loanIDStr, 10, 32)
+	if err != nil {
+		utils.BadRequestResponse(c, "ID del préstamo debe ser un número válido")
+		return
+	}
+
+	// Procesar decisión del préstamo
+	loanResponse, err := ctrl.loanService.ProcessLoanDecision(uint(loanID))
+	if err != nil {
+		utils.InternalServerErrorResponse(c, err.Error())
+		return
+	}
+
+	// Retornar respuesta exitosa
+	utils.SuccessResponse(c, 200, "Decisión del préstamo procesada exitosamente", loanResponse)
 }
