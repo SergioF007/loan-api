@@ -141,26 +141,6 @@ func (ctrl *LoanController) SaveLoanData(c *gin.Context) {
 func (ctrl *LoanController) GetLoan(c *gin.Context) {
 	log.Println("LoanController::GetLoan was invoked")
 
-	// Validar header X-Tenant-ID
-	tenantIDStr := c.GetHeader("X-Tenant-ID")
-	if tenantIDStr == "" {
-		utils.BadRequestResponse(c, "Header X-Tenant-ID es requerido")
-		return
-	}
-
-	tenantID, err := strconv.ParseUint(tenantIDStr, 10, 32)
-	if err != nil {
-		utils.BadRequestResponse(c, "X-Tenant-ID debe ser un número válido")
-		return
-	}
-
-	// Validar que el tenant existe
-	_, err = ctrl.tenantService.ValidateTenantID(uint(tenantID))
-	if err != nil {
-		utils.NotFoundResponse(c, "Tenant no encontrado")
-		return
-	}
-
 	// Obtener ID del préstamo desde los parámetros
 	loanIDStr := c.Param("id")
 	loanID, err := strconv.ParseUint(loanIDStr, 10, 32)
@@ -196,18 +176,6 @@ func (ctrl *LoanController) GetLoan(c *gin.Context) {
 // @Router /loans/user [get]
 func (ctrl *LoanController) GetUserLoans(c *gin.Context) {
 	log.Println("LoanController::GetUserLoans was invoked")
-
-	// Validar header X-Tenant-ID
-	tenantIDStr := c.GetHeader("X-Tenant-ID")
-
-	tenantID, err := strconv.ParseUint(tenantIDStr, 10, 32)
-
-	// Validar que el tenant existe
-	_, err = ctrl.tenantService.ValidateTenantID(uint(tenantID))
-	if err != nil {
-		utils.NotFoundResponse(c, "Tenant no encontrado")
-		return
-	}
 
 	// Obtener ID del usuario desde el contexto (middleware de autenticación)
 	userID, exists := c.Get("user_id")
